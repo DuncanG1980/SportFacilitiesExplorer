@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Ireland Sports Facilities Explorer</title>
+
+    <!-- MapLibre -->
+    <link
+        href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css"
+        rel="stylesheet"
+    >
+
+    <!-- Our CSS -->
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+</head>
+
+
+<body>
+
+    <!-- =====================================================
+         MAP
+    ====================================================== -->
+
+    <div id="map"></div>
+
+
+    <!-- =====================================================
+         SPIDER CENTRE TARGET
+    ====================================================== -->
+
+    <div
+        id="spiderTarget"
+        class="spider-target hidden"
+    >
+        <div class="target-ring"></div>
+        <div class="target-dot"></div>
+    </div>
+
+
+    <!-- =====================================================
+         TITLE
+    ====================================================== -->
+
+    <div class="title-panel">
+
+        <div class="title-main">
+            Ireland Sports Facilities
+        </div>
+
+        <div class="title-sub">
+            Explore national sports facility provision
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         SPIDER BADGE
+    ====================================================== -->
+
+    <div
+        id="spiderBadge"
+        class="spider-badge hidden"
+    >
+        🕷 SPIDER MODE — 8 nearest facilities to map centre
+    </div>
+
+
+    <!-- =====================================================
+         MAIN CONTROL PANEL
+    ====================================================== -->
+
+    <div class="control-panel">
+
+        <!-- MODE -->
+
+        <div class="section-label">
+            Mode
+        </div>
+
+        <div class="mode-switch">
+
+            <button
+                id="pointModeButton"
+                class="mode-button active"
+            >
+                📍 Point Search
+            </button>
+
+            <button
+                id="spiderModeButton"
+                class="mode-button"
+            >
+                🕷 Spider
+            </button>
+
+        </div>
+
+
+        <div
+            id="modeDescription"
+            class="mode-description"
+        >
+            Choose a sport, then click anywhere on the map.
+        </div>
+
+
+        <!-- SPORT -->
+
+        <div class="control-group">
+
+            <label for="sportSelect">
+                Sport
+            </label>
+
+            <select id="sportSelect">
+
+                <option value="">
+                    Loading sports...
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <!-- NUMBER -->
+
+        <div
+            id="numberGroup"
+            class="control-group"
+        >
+
+            <label for="numberSelect">
+                Number of facilities
+            </label>
+
+            <select id="numberSelect">
+                <option value="5">5</option>
+                <option value="8">8</option>
+                <option value="10" selected>10</option>
+                <option value="15">15</option>
+                <option value="20">20</option>
+            </select>
+
+        </div>
+
+
+        <!-- =================================================
+             ADVANCED FILTERS
+        ================================================== -->
+
+        <details class="advanced-filters">
+
+            <summary>
+                Advanced filters
+            </summary>
+
+
+            <div class="filter-grid">
+
+                <div class="control-group">
+
+                    <label for="typeSelect">
+                        Facility type
+                    </label>
+
+                    <select id="typeSelect">
+                        <option value="">Any</option>
+                    </select>
+
+                </div>
+
+
+                <div class="control-group">
+
+                    <label for="surfaceSelect">
+                        Surface
+                    </label>
+
+                    <select id="surfaceSelect">
+                        <option value="">Any</option>
+                    </select>
+
+                </div>
+
+
+                <div class="control-group">
+
+                    <label for="sizeSelect">
+                        Size
+                    </label>
+
+                    <select id="sizeSelect">
+                        <option value="">Any</option>
+                    </select>
+
+                </div>
+
+
+                <div class="control-group">
+
+                    <label for="floodlightsSelect">
+                        Floodlights
+                    </label>
+
+                    <select id="floodlightsSelect">
+                        <option value="">Any</option>
+                    </select>
+
+                </div>
+
+
+                <div class="control-group">
+
+                    <label for="ownerSelect">
+                        Owner
+                    </label>
+
+                    <select id="ownerSelect">
+                        <option value="">Any</option>
+                    </select>
+
+                </div>
+
+
+                <div class="control-group">
+
+                    <label for="qualitySelect">
+                        Quality
+                    </label>
+
+                    <select id="qualitySelect">
+
+                        <option value="">
+                            Any
+                        </option>
+
+                        <option value="1">
+                            Poor
+                        </option>
+
+                        <option value="2">
+                            Good / Satisfactory
+                        </option>
+
+                        <option value="3">
+                            Excellent
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+        </details>
+
+
+        <!-- STATUS -->
+
+        <div
+            id="status"
+            class="status"
+        >
+            Loading facility information...
+        </div>
+
+
+        <!-- CLEAR -->
+
+        <button
+            id="clearButton"
+            class="clear-button"
+        >
+            Clear
+        </button>
+
+
+        <!-- =================================================
+             ANALYSIS
+        ================================================== -->
+
+        <div class="analysis-divider"></div>
+
+        <div class="analysis-title">
+            Analysis
+        </div>
+
+        <div class="analysis-buttons">
+
+            <button id="areaSummaryButton">
+                📊 Summarise View
+            </button>
+
+        </div>
+
+
+        <div
+            id="areaSummary"
+            class="area-summary hidden"
+        ></div>
+
+
+        <!-- RESULTS -->
+
+        <div
+            id="results"
+            class="results"
+        ></div>
+
+    </div>
+
+
+    <!-- =====================================================
+         FACILITY COUNT
+    ====================================================== -->
+
+    <div
+        id="facilityCounter"
+        class="facility-counter"
+    >
+        Loading facilities...
+    </div>
+
+
+    <!-- =====================================================
+         FACILITY INFORMATION CARD
+    ====================================================== -->
+
+    <div
+        id="facilityCard"
+        class="facility-card hidden"
+    >
+
+        <button
+            id="closeFacilityCard"
+            class="facility-card-close"
+            title="Close"
+        >
+            ×
+        </button>
+
+        <div class="facility-card-heading">
+            Facility
+        </div>
+
+        <div
+            id="facilityCardContent"
+            class="facility-card-content"
+        ></div>
+
+    </div>
+
+
+    <!-- =====================================================
+         LIBRARIES
+    ====================================================== -->
+
+    <script
+        src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"
+    ></script>
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"
+    ></script>
+
+
+    <!-- APP -->
+
+    <script src="app.js"></script>
+
+</body>
+
+</html>
