@@ -3,7 +3,7 @@
 // ==========================================================
 
 const FACILITIES_URL =
-    "https://services-eu1.arcgis.com/z1y55jruXrgzzpdi/arcgis/rest/services/Facilities/FeatureServer/0";
+    "https://services-eu1.arcgis.com/z1y55jruXrgzzpdi/arcgis/rest/services/Facilities_view/FeatureServer/0";
 
 const VALIDATION_FILTER =
     "(Validation <> 'Remove' OR Validation IS NULL)";
