@@ -1,3817 +1,2642 @@
-// ==========================================================
-// CONFIGURATION
-// ==========================================================
-
-const FACILITIES_URL =
-    "https://services-eu1.arcgis.com/z1y55jruXrgzzpdi/arcgis/rest/services/Facilities_view/FeatureServer/0";
-
-const VALIDATION_FILTER =
-    "(Validation <> 'Remove' OR Validation IS NULL)";
-
-const PAGE_SIZE = 2000;
-
-const SPIDER_COUNT = 8;
-const SPIDER_FRAME_INTERVAL = 60;
-const SPIDER_CACHE_RADIUS_KM = 45;
-
-
-// ==========================================================
-// DOM
-// ==========================================================
-
-const sportSelect = document.getElementById("sportSelect");
-const numberSelect = document.getElementById("numberSelect");
-const numberGroup = document.getElementById("numberGroup");
-
-const typeSelect = document.getElementById("typeSelect");
-const surfaceSelect = document.getElementById("surfaceSelect");
-const sizeSelect = document.getElementById("sizeSelect");
-const floodlightsSelect = document.getElementById("floodlightsSelect");
-const ownerSelect = document.getElementById("ownerSelect");
-const qualitySelect = document.getElementById("qualitySelect");
-
-const pointModeButton = document.getElementById("pointModeButton");
-const spiderModeButton = document.getElementById("spiderModeButton");
-
-const modeDescription = document.getElementById("modeDescription");
-const statusElement = document.getElementById("status");
-const resultsElement = document.getElementById("results");
-const clearButton = document.getElementById("clearButton");
-
-const facilityCounter = document.getElementById("facilityCounter");
-
-const spiderTarget = document.getElementById("spiderTarget");
-const spiderBadge = document.getElementById("spiderBadge");
-
-const facilityCard = document.getElementById("facilityCard");
-const facilityCardContent = document.getElementById("facilityCardContent");
-const closeFacilityCard = document.getElementById("closeFacilityCard");
-
-const areaSummaryButton = document.getElementById("areaSummaryButton");
-const areaSummary = document.getElementById("areaSummary");
-
-
-// ==========================================================
-// STATE
-// ==========================================================
-
-let currentMode = "point";
-
-let searchMarker = null;
-let searchPoint = null;
-
-let layerInfo = null;
-
-let backgroundRequestID = 0;
-
-let spiderCache = [];
-let spiderCacheBounds = null;
-let spiderCacheKey = null;
-let spiderCacheLoading = false;
-let spiderCacheBuildID = 0;
-
-let lastSpiderFrame = 0;
-
-
-// ==========================================================
-// MAP
-// ==========================================================
-
-const map = new maplibregl.Map({
-
-    container: "map",
-
-    center: [-8.0, 53.35],
-
-    zoom: 6,
-
-    style: {
-
-        version: 8,
-
-        sources: {
-
-            osm: {
-
-                type: "raster",
-
-                tiles: [
-                    "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                ],
-
-                tileSize: 256,
-
-                attribution:
-                    "© OpenStreetMap contributors"
-
-            }
-
-        },
-
-        layers: [
-
-            {
-                id: "osm",
-                type: "raster",
-                source: "osm"
-            }
-
-        ]
-
-    }
-
-});
-
-
-map.addControl(
-    new maplibregl.NavigationControl(),
-    "top-right"
-);
-
-
-// ==========================================================
-// STARTUP
-// ==========================================================
-
-map.on("load", async () => {
-
-    await loadLayerInformation();
-
-    await loadVisibleFacilities();
-
-    statusElement.textContent =
-        "Choose a sport, then click anywhere on the map.";
-
-});
-
-
-// ==========================================================
-// ARC GIS LAYER INFORMATION
-// ==========================================================
-
-async function loadLayerInformation() {
-
-    try {
-
-        const response =
-            await fetch(`${FACILITIES_URL}?f=json`);
-
-        layerInfo =
-            await response.json();
-
-
-        populateDomain(
-            "Sport",
-            sportSelect,
-            "Choose sport..."
-        );
-
-        populateDomain(
-            "Infrastructure_Type",
-            typeSelect,
-            "Any"
-        );
-
-        populateDomain(
-            "Surface",
-            surfaceSelect,
-            "Any"
-        );
-
-
-        if (fieldExists("Size")) {
-
-            populateDomain(
-                "Size",
-                sizeSelect,
-                "Any"
-            );
-
-        }
-
-        else if (fieldExists("Facility_Size")) {
-
-            populateDomain(
-                "Facility_Size",
-                sizeSelect,
-                "Any"
-            );
-
-        }
-
-
-        populateDomain(
-            "Floodlights",
-            floodlightsSelect,
-            "Any"
-        );
-
-        populateDomain(
-            "Owner",
-            ownerSelect,
-            "Any"
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "Could not load layer information:",
-            error
-        );
-
-        sportSelect.innerHTML =
-            `<option value="">Could not load sports</option>`;
-
-    }
-
-}
-
-
-function populateDomain(
-    fieldName,
-    select,
-    blankLabel
+require([
+  "esri/Map",
+  "esri/Basemap",
+  "esri/views/MapView",
+  "esri/layers/FeatureLayer",
+  "esri/layers/OpenStreetMapLayer",
+  "esri/widgets/Search",
+  "esri/geometry/Extent",
+  "esri/geometry/geometryEngine"
+], function (
+  Map,
+  Basemap,
+  MapView,
+  FeatureLayer,
+  OpenStreetMapLayer,
+  Search,
+  Extent,
+  geometryEngine
 ) {
 
+  // =========================================================
+  // SETTINGS
+  // =========================================================
+
+  const FACILITIES_URL =
+    "https://services-eu1.arcgis.com/z1y55jruXrgzzpdi/arcgis/rest/services/Sport_Ireland_Facilities_Mapping/FeatureServer/0";
+
+  const CLICK_TOLERANCE_PIXELS = 14;
+
+  const OSM_OPACITY = 0.45;
+
+  const IRELAND_CENTER = [
+    -8,
+    53.4
+  ];
+
+  const IRELAND_ZOOM = 7;
+
+
+  // =========================================================
+  // MAIN SPORTS
+  // =========================================================
+
+  const mainSports = [
+    {
+      value: "Gaelic Games",
+      label: "Gaelic Games"
+    },
+    {
+      value: "Soccer",
+      label: "Soccer"
+    },
+    {
+      value: "Golf",
+      label: "Golf"
+    },
+    {
+      value: "Tennis",
+      label: "Tennis"
+    },
+    {
+      value: "Basketball",
+      label: "Basketball"
+    },
+    {
+      value: "Athletics",
+      label: "Athletics"
+    },
+    {
+      value: "Hockey",
+      label: "Hockey"
+    },
+    {
+      value: "Cricket",
+      label: "Cricket"
+    },
+    {
+      value: "Sports Hall",
+      label: "Sports Halls"
+    },
+    {
+      value: "Swimming Indoor",
+      label: "Swimming Indoor"
+    }
+  ];
+
+
+  // =========================================================
+  // SPORT COLOURS
+  // =========================================================
+
+  const sportColours = {
+    "Gaelic Games": [0, 176, 80],
+    "Soccer": [25, 110, 235],
+    "Golf": [120, 145, 95],
+    "Tennis": [235, 205, 0],
+    "Basketball": [255, 145, 20],
+    "Athletics": [145, 65, 205],
+    "Hockey": [55, 65, 175],
+    "Cricket": [185, 90, 165],
+    "Sports Hall": [105, 105, 140],
+    "Swimming Indoor": [0, 185, 220],
+
+    "Rugby": [230, 65, 55],
+    "Swimming Outdoor": [70, 165, 195],
+    "Equestrian": [145, 125, 105],
+    "Badminton": [220, 95, 155],
+    "Boxing": [185, 75, 55],
+    "Cycling": [55, 155, 125],
+    "Gym": [105, 105, 105],
+    "Gymnastics": [170, 100, 195],
+    "Rowing": [55, 125, 175],
+    "Sailing": [45, 145, 185],
+    "Padel": [230, 165, 30],
+    "5-a-side": [70, 155, 230],
+    "Pitch and Putt": [130, 140, 120],
+    "Canoe/Kayak": [100, 130, 135],
+    "GAA Handball": [115, 115, 115],
+    "Multiple": [145, 95, 165],
+    "Other": [145, 145, 145]
+  };
+
+
+  // =========================================================
+  // RENDERER
+  // =========================================================
+
+  const rendererInfos =
+    Object.entries(sportColours).map(
+      function ([sport, colour]) {
+
+        return {
+          value: sport,
+
+          symbol: {
+            type: "simple-fill",
+
+            color: [
+              colour[0],
+              colour[1],
+              colour[2],
+              0.44
+            ],
+
+            outline: {
+              color: [
+                colour[0],
+                colour[1],
+                colour[2],
+                1
+              ],
+
+              width: 2
+            }
+          }
+        };
+
+      }
+    );
+
+
+  // =========================================================
+  // FACILITY LAYER
+  // =========================================================
+
+  const facilitiesLayer =
+    new FeatureLayer({
+
+      url: FACILITIES_URL,
+
+      outFields: [
+        "OBJECTID",
+        "Sport",
+        "Infrastructure_Type",
+        "Surface",
+        "Floodlights",
+        "Owner",
+        "Facility_Size",
+        "Owner_Name",
+        "Quality",
+        "Local_Authority",
+        "LEA",
+        "Multi_Use",
+        "Area_msq"
+      ],
+
+      minScale: 0,
+
+      popupEnabled: false,
+
+      renderer: {
+        type: "unique-value",
+
+        field: "Sport",
+
+        defaultSymbol: {
+          type: "simple-fill",
+
+          color: [
+            145,
+            145,
+            145,
+            0.27
+          ],
+
+          outline: {
+            color: [
+              100,
+              100,
+              100,
+              1
+            ],
+
+            width: 1.5
+          }
+        },
+
+        uniqueValueInfos:
+          rendererInfos
+      }
+
+    });
+
+
+  // =========================================================
+  // BASEMAP
+  // =========================================================
+
+  const osmLayer =
+    new OpenStreetMapLayer({
+      opacity: OSM_OPACITY
+    });
+
+
+  const customBasemap =
+    new Basemap({
+
+      baseLayers: [
+        osmLayer
+      ],
+
+      title:
+        "Muted OpenStreetMap"
+
+    });
+
+
+  // =========================================================
+  // MAP
+  // =========================================================
+
+  const map =
+    new Map({
+
+      basemap:
+        customBasemap,
+
+      layers: [
+        facilitiesLayer
+      ]
+
+    });
+
+
+  // =========================================================
+  // VIEW
+  // =========================================================
+
+  const view =
+    new MapView({
+
+      container:
+        "viewDiv",
+
+      map:
+        map,
+
+      center:
+        IRELAND_CENTER,
+
+      zoom:
+        IRELAND_ZOOM,
+
+      background: {
+        color: [
+          245,
+          246,
+          245,
+          1
+        ]
+      },
+
+      constraints: {
+        minZoom: 6
+      },
+
+      highlightOptions: {
+        color: [
+          0,
+          190,
+          175,
+          1
+        ],
+
+        haloOpacity: 0.9,
+
+        fillOpacity: 0.10
+      }
+
+    });
+
+
+  // =========================================================
+  // SEARCH
+  // =========================================================
+
+  const search =
+    new Search({
+
+      view: view,
+
+      includeDefaultSources: true,
+
+      locationEnabled: false
+
+    });
+
+
+  view.ui.add(
+    search,
+    "top-right"
+  );
+
+
+  // =========================================================
+  // STATE
+  // =========================================================
+
+  let facilitiesLayerView =
+    null;
+
+  let highlightHandle =
+    null;
+
+  let currentOverlayGraphic =
+    null;
+
+  let selectedGraphics =
+    [];
+
+  let selectedIndex =
+    0;
+
+  let selectedGraphic =
+    null;
+
+
+  // =========================================================
+  // HTML ELEMENTS
+  // =========================================================
+
+  const resultCount =
+    document.getElementById(
+      "resultCount"
+    );
+
+  const emptyState =
+    document.getElementById(
+      "emptyState"
+    );
+
+  const facilityDetails =
+    document.getElementById(
+      "facilityDetails"
+    );
+
+  const closeDetails =
+    document.getElementById(
+      "closeDetails"
+    );
+
+  const zoomToFacility =
+    document.getElementById(
+      "zoomToFacility"
+    );
+
+  const homeButton =
+    document.getElementById(
+      "homeButton"
+    );
+
+  const selectAllFilters =
+    document.getElementById(
+      "selectAllFilters"
+    );
+
+  const deselectAllFilters =
+    document.getElementById(
+      "deselectAllFilters"
+    );
+
+  const mainSportFilters =
+    document.getElementById(
+      "mainSportFilters"
+    );
+
+  const moreSportFilters =
+    document.getElementById(
+      "moreSportFilters"
+    );
+
+  const moreSportsButton =
+    document.getElementById(
+      "moreSportsButton"
+    );
+
+  const moreSportsArrow =
+    document.getElementById(
+      "moreSportsArrow"
+    );
+
+  const ownerFilters =
+    document.getElementById(
+      "ownerFilters"
+    );
+
+  const legendItems =
+    document.getElementById(
+      "legendItems"
+    );
+
+  const selectionNavigator =
+    document.getElementById(
+      "selectionNavigator"
+    );
+
+  const selectionPosition =
+    document.getElementById(
+      "selectionPosition"
+    );
+
+  const previousFacility =
+    document.getElementById(
+      "previousFacility"
+    );
+
+  const nextFacility =
+    document.getElementById(
+      "nextFacility"
+    );
+
+
+  // =========================================================
+  // LOAD
+  // =========================================================
+
+  view.when(
+    async function () {
+
+      await facilitiesLayer.load();
+
+      facilitiesLayerView =
+        await view.whenLayerView(
+          facilitiesLayer
+        );
+
+      buildFilterLists();
+
+      buildLegend();
+
+      await updateResultCount();
+
+    }
+  )
+  .catch(
+    function (error) {
+
+      console.error(
+        "LOAD ERROR:",
+        error
+      );
+
+      if (resultCount) {
+
+        resultCount.textContent =
+          "Unable to load facilities";
+
+      }
+
+    }
+  );
+
+
+  // =========================================================
+  // BUILD FILTERS
+  // =========================================================
+
+  function buildFilterLists() {
+
+    buildSportFilters();
+
+    buildDomainFilter(
+      "Owner",
+      ownerFilters,
+      "owner-filter"
+    );
+
+  }
+
+
+  // =========================================================
+  // SPORT FILTERS
+  // =========================================================
+
+  function buildSportFilters() {
+
+    const sportField =
+      facilitiesLayer.fields.find(
+        function (field) {
+
+          return (
+            field.name ===
+            "Sport"
+          );
+
+        }
+      );
+
+
     if (
-        !layerInfo ||
-        !layerInfo.fields
+      !sportField ||
+      !sportField.domain ||
+      !sportField.domain.codedValues
     ) {
-        return;
+
+      console.error(
+        "Sport domain not found"
+      );
+
+      return;
+
+    }
+
+
+    mainSportFilters.innerHTML =
+      "";
+
+    moreSportFilters.innerHTML =
+      "";
+
+
+    const domainValues =
+      sportField.domain.codedValues.slice();
+
+
+    mainSports.forEach(
+      function (mainSport) {
+
+        const match =
+          domainValues.find(
+            function (codedValue) {
+
+              return (
+                codedValue.code ===
+                  mainSport.value ||
+                codedValue.name ===
+                  mainSport.value
+              );
+
+            }
+          );
+
+
+        if (match) {
+
+          addSportCheckbox(
+            match,
+            mainSportFilters,
+            mainSport.label
+          );
+
+        }
+
+      }
+    );
+
+
+    const mainValues =
+      mainSports.map(
+        function (sport) {
+
+          return sport.value;
+
+        }
+      );
+
+
+    domainValues
+
+      .filter(
+        function (codedValue) {
+
+          return (
+            !mainValues.includes(
+              codedValue.code
+            )
+            &&
+            !mainValues.includes(
+              codedValue.name
+            )
+          );
+
+        }
+      )
+
+      .sort(
+        function (a, b) {
+
+          return a.name.localeCompare(
+            b.name
+          );
+
+        }
+      )
+
+      .forEach(
+        function (codedValue) {
+
+          addSportCheckbox(
+            codedValue,
+            moreSportFilters,
+            codedValue.name
+          );
+
+        }
+      );
+
+  }
+
+
+  // =========================================================
+  // ADD SPORT CHECKBOX
+  // =========================================================
+
+  function addSportCheckbox(
+    codedValue,
+    container,
+    displayLabel
+  ) {
+
+    const label =
+      document.createElement(
+        "label"
+      );
+
+
+    label.className =
+      "checkbox-item";
+
+
+    const checkbox =
+      document.createElement(
+        "input"
+      );
+
+
+    checkbox.type =
+      "checkbox";
+
+
+    checkbox.value =
+      codedValue.code;
+
+
+    checkbox.classList.add(
+      "sport-filter"
+    );
+
+
+    checkbox.checked =
+      true;
+
+
+    label.appendChild(
+      checkbox
+    );
+
+
+    const square =
+      document.createElement(
+        "span"
+      );
+
+
+    square.className =
+      "colour-square";
+
+
+    const colour =
+      sportColours[
+        codedValue.code
+      ]
+      ||
+      sportColours[
+        codedValue.name
+      ]
+      ||
+      [
+        145,
+        145,
+        145
+      ];
+
+
+    square.style.backgroundColor =
+      "rgb(" +
+      colour[0] +
+      "," +
+      colour[1] +
+      "," +
+      colour[2] +
+      ")";
+
+
+    label.appendChild(
+      square
+    );
+
+
+    const text =
+      document.createElement(
+        "span"
+      );
+
+
+    text.textContent =
+      displayLabel;
+
+
+    label.appendChild(
+      text
+    );
+
+
+    checkbox.addEventListener(
+      "change",
+      applyFilters
+    );
+
+
+    container.appendChild(
+      label
+    );
+
+  }
+
+
+  // =========================================================
+  // OWNER FILTER
+  // =========================================================
+
+  function buildDomainFilter(
+    fieldName,
+    container,
+    className
+  ) {
+
+    if (!container) {
+      return;
     }
 
 
     const field =
-        layerInfo.fields.find(
-            item => item.name === fieldName
-        );
+      facilitiesLayer.fields.find(
+        function (fieldItem) {
 
+          return (
+            fieldItem.name ===
+            fieldName
+          );
 
-    select.innerHTML =
-        `<option value="">${escapeHtml(blankLabel)}</option>`;
+        }
+      );
 
 
     if (
-        !field ||
-        !field.domain ||
-        !field.domain.codedValues
+      !field ||
+      !field.domain ||
+      !field.domain.codedValues
     ) {
-        return;
+
+      return;
+
     }
+
+
+    container.innerHTML =
+      "";
 
 
     field.domain.codedValues.forEach(
-        item => {
+      function (codedValue) {
 
-            const option =
-                document.createElement("option");
+        const label =
+          document.createElement(
+            "label"
+          );
 
-            option.value =
-                item.code;
 
-            option.textContent =
-                item.name;
+        label.className =
+          "checkbox-item";
 
-            select.appendChild(option);
+
+        const checkbox =
+          document.createElement(
+            "input"
+          );
+
+
+        checkbox.type =
+          "checkbox";
+
+
+        checkbox.value =
+          codedValue.code;
+
+
+        checkbox.classList.add(
+          className
+        );
+
+
+        checkbox.checked =
+          true;
+
+
+        label.appendChild(
+          checkbox
+        );
+
+
+        const text =
+          document.createElement(
+            "span"
+          );
+
+
+        text.textContent =
+          codedValue.name;
+
+
+        label.appendChild(
+          text
+        );
+
+
+        checkbox.addEventListener(
+          "change",
+          applyFilters
+        );
+
+
+        container.appendChild(
+          label
+        );
+
+      }
+    );
+
+  }
+
+
+  // =========================================================
+  // MORE SPORTS
+  // =========================================================
+
+  if (moreSportsButton) {
+
+    moreSportsButton.addEventListener(
+      "click",
+      function () {
+
+        const isHidden =
+          moreSportFilters.classList.contains(
+            "hidden"
+          );
+
+
+        if (isHidden) {
+
+          moreSportFilters.classList.remove(
+            "hidden"
+          );
+
+          moreSportsArrow.textContent =
+            "▴";
 
         }
+        else {
+
+          moreSportFilters.classList.add(
+            "hidden"
+          );
+
+          moreSportsArrow.textContent =
+            "▾";
+
+        }
+
+      }
     );
 
-}
+  }
 
 
-function fieldExists(fieldName) {
+  // =========================================================
+  // LEGEND
+  // =========================================================
 
-    return Boolean(
+  function buildLegend() {
 
-        layerInfo?.fields?.some(
-            field => field.name === fieldName
+    if (!legendItems) {
+      return;
+    }
+
+
+    legendItems.innerHTML =
+      "";
+
+
+    mainSports.forEach(
+      function (sport) {
+
+        const row =
+          document.createElement(
+            "div"
+          );
+
+
+        row.className =
+          "legend-item";
+
+
+        const square =
+          document.createElement(
+            "span"
+          );
+
+
+        square.className =
+          "legend-colour";
+
+
+        const colour =
+          sportColours[
+            sport.value
+          ]
+          ||
+          [
+            145,
+            145,
+            145
+          ];
+
+
+        square.style.backgroundColor =
+          "rgb(" +
+          colour[0] +
+          "," +
+          colour[1] +
+          "," +
+          colour[2] +
+          ")";
+
+
+        const text =
+          document.createElement(
+            "span"
+          );
+
+
+        text.textContent =
+          sport.label;
+
+
+        row.appendChild(
+          square
+        );
+
+
+        row.appendChild(
+          text
+        );
+
+
+        legendItems.appendChild(
+          row
+        );
+
+      }
+    );
+
+  }
+
+
+  // =========================================================
+  // APPLY FILTERS
+  // =========================================================
+
+  async function applyFilters() {
+
+    if (!facilitiesLayerView) {
+      return;
+    }
+
+
+    const selectedSports =
+      getCheckedValues(
+        ".sport-filter"
+      );
+
+
+    const selectedOwners =
+      getCheckedValues(
+        ".owner-filter"
+      );
+
+
+    const totalSportBoxes =
+      document.querySelectorAll(
+        ".sport-filter"
+      ).length;
+
+
+    const totalOwnerBoxes =
+      document.querySelectorAll(
+        ".owner-filter"
+      ).length;
+
+
+    const nothingSelected =
+      selectedSports.length === 0 &&
+      selectedOwners.length === 0;
+
+
+    if (nothingSelected) {
+
+      facilitiesLayerView.filter = {
+        where: "1=0"
+      };
+
+
+      clearSelection();
+
+      await updateResultCount();
+
+      return;
+
+    }
+
+
+    const clauses =
+      [];
+
+
+    if (
+      selectedSports.length > 0 &&
+      selectedSports.length <
+        totalSportBoxes
+    ) {
+
+      clauses.push(
+        buildInClause(
+          "Sport",
+          selectedSports
         )
-
-    );
-
-}
-
-
-// ==========================================================
-// FILTERS
-// ==========================================================
-
-function buildWhereClause() {
-
-    const clauses = [
-        VALIDATION_FILTER
-    ];
-
-
-    addTextFilter(
-        clauses,
-        "Sport",
-        sportSelect.value
-    );
-
-    addTextFilter(
-        clauses,
-        "Infrastructure_Type",
-        typeSelect.value
-    );
-
-    addTextFilter(
-        clauses,
-        "Surface",
-        surfaceSelect.value
-    );
-
-
-    if (fieldExists("Size")) {
-
-        addTextFilter(
-            clauses,
-            "Size",
-            sizeSelect.value
-        );
+      );
 
     }
-
-    else if (fieldExists("Facility_Size")) {
-
-        addTextFilter(
-            clauses,
-            "Facility_Size",
-            sizeSelect.value
-        );
-
-    }
-
-
-    addTextFilter(
-        clauses,
-        "Floodlights",
-        floodlightsSelect.value
-    );
-
-    addTextFilter(
-        clauses,
-        "Owner",
-        ownerSelect.value
-    );
 
 
     if (
-        qualitySelect.value &&
-        fieldExists("Quality")
+      selectedOwners.length > 0 &&
+      selectedOwners.length <
+        totalOwnerBoxes
     ) {
 
-        clauses.push(
-            `Quality = ${Number(qualitySelect.value)}`
-        );
+      clauses.push(
+        buildInClause(
+          "Owner",
+          selectedOwners
+        )
+      );
 
     }
 
 
-    return clauses.join(" AND ");
+    const whereClause =
+      clauses.length > 0
+        ? clauses.join(
+            " AND "
+          )
+        : "1=1";
 
-}
+
+    facilitiesLayerView.filter = {
+      where: whereClause
+    };
 
 
-function addTextFilter(
-    clauses,
+    clearSelection();
+
+    await updateResultCount();
+
+  }
+
+
+  // =========================================================
+  // FILTER HELPERS
+  // =========================================================
+
+  function getCurrentWhereClause() {
+
+    if (
+      facilitiesLayerView &&
+      facilitiesLayerView.filter &&
+      facilitiesLayerView.filter.where
+    ) {
+
+      return (
+        facilitiesLayerView.filter.where
+      );
+
+    }
+
+
+    return "1=1";
+
+  }
+
+
+  function getCheckedValues(
+    selector
+  ) {
+
+    return Array.from(
+
+      document.querySelectorAll(
+        selector + ":checked"
+      )
+
+    ).map(
+      function (checkbox) {
+
+        return checkbox.value;
+
+      }
+    );
+
+  }
+
+
+  function buildInClause(
     fieldName,
-    value
-) {
+    values
+  ) {
 
-    if (
-        !value ||
-        !fieldExists(fieldName)
-    ) {
-        return;
-    }
+    const escapedValues =
+      values.map(
+        function (value) {
+
+          return (
+            "'" +
+            String(value).replace(
+              /'/g,
+              "''"
+            ) +
+            "'"
+          );
+
+        }
+      );
 
 
-    const safe =
-        String(value)
-            .replaceAll(
-                "'",
-                "''"
-            );
-
-
-    clauses.push(
-        `${fieldName} = '${safe}'`
+    return (
+      fieldName +
+      " IN (" +
+      escapedValues.join(",") +
+      ")"
     );
 
-}
+  }
 
 
-// ==========================================================
-// BACKGROUND FACILITIES
-// ==========================================================
+  // =========================================================
+  // SELECT ALL
+  // =========================================================
 
-async function loadVisibleFacilities() {
+  if (selectAllFilters) {
 
-    if (currentMode === "spider") {
-        return;
+    selectAllFilters.addEventListener(
+      "click",
+      async function () {
+
+        document
+          .querySelectorAll(
+            ".sport-filter, .owner-filter"
+          )
+          .forEach(
+            function (checkbox) {
+
+              checkbox.checked =
+                true;
+
+            }
+          );
+
+
+        if (facilitiesLayerView) {
+
+          facilitiesLayerView.filter =
+            null;
+
+        }
+
+
+        clearSelection();
+
+        await updateResultCount();
+
+      }
+    );
+
+  }
+
+
+  // =========================================================
+  // DESELECT ALL
+  // =========================================================
+
+  if (deselectAllFilters) {
+
+    deselectAllFilters.addEventListener(
+      "click",
+      async function () {
+
+        document
+          .querySelectorAll(
+            ".sport-filter, .owner-filter"
+          )
+          .forEach(
+            function (checkbox) {
+
+              checkbox.checked =
+                false;
+
+            }
+          );
+
+
+        if (facilitiesLayerView) {
+
+          facilitiesLayerView.filter = {
+            where: "1=0"
+          };
+
+        }
+
+
+        clearSelection();
+
+        await updateResultCount();
+
+      }
+    );
+
+  }
+
+
+  // =========================================================
+  // RESULT COUNT
+  // =========================================================
+
+  async function updateResultCount() {
+
+    if (!facilitiesLayerView) {
+      return;
     }
-
-
-    const requestID =
-        ++backgroundRequestID;
-
-
-    const bounds =
-        map.getBounds();
-
-
-    const envelope = [
-
-        bounds.getWest(),
-        bounds.getSouth(),
-        bounds.getEast(),
-        bounds.getNorth()
-
-    ].join(",");
-
-
-    facilityCounter.textContent =
-        "Loading facilities...";
 
 
     try {
 
-        const features =
-            await queryAllFacilitiesInEnvelope(
-                envelope,
-                VALIDATION_FILTER
-            );
+      const query =
+        facilitiesLayer.createQuery();
 
 
-        if (
-            requestID !==
-            backgroundRequestID
-        ) {
-            return;
-        }
+      query.where =
+        getCurrentWhereClause();
 
 
-        ensureBackgroundLayers();
-
-
-        map.getSource(
-            "background-facilities"
-        ).setData(
-            turf.featureCollection(features)
+      const count =
+        await facilitiesLayer.queryFeatureCount(
+          query
         );
 
 
-        setBackgroundVisibility(true);
+      if (resultCount) {
 
+        resultCount.textContent =
+          count.toLocaleString(
+            "en-IE"
+          )
+          +
+          (
+            count === 1
+              ? " facility"
+              : " facilities"
+          );
 
-        facilityCounter.textContent =
-            `${features.length.toLocaleString()} facilities in view`;
-
-
-        console.log(
-            `Displaying ${features.length} facilities in current extent`
-        );
+      }
 
     }
-
     catch (error) {
 
+      console.error(
+        "COUNT ERROR:",
+        error
+      );
+
+    }
+
+  }
+
+
+  // =========================================================
+  // CLICK FACILITY
+  // =========================================================
+
+  view.on(
+    "click",
+    async function (event) {
+
+      try {
+
+        const clickedPoint =
+          event.mapPoint;
+
+
+        if (!clickedPoint) {
+
+          clearSelection();
+
+          return;
+
+        }
+
+
+        const topLeft =
+          view.toMap({
+            x:
+              event.x -
+              CLICK_TOLERANCE_PIXELS,
+
+            y:
+              event.y -
+              CLICK_TOLERANCE_PIXELS
+          });
+
+
+        const bottomRight =
+          view.toMap({
+            x:
+              event.x +
+              CLICK_TOLERANCE_PIXELS,
+
+            y:
+              event.y +
+              CLICK_TOLERANCE_PIXELS
+          });
+
+
         if (
-            requestID !==
-            backgroundRequestID
+          !topLeft ||
+          !bottomRight
         ) {
-            return;
-        }
 
+          clearSelection();
 
-        console.error(
-            "Background facilities failed:",
-            error
-        );
-
-
-        facilityCounter.textContent =
-            "Facilities unavailable";
-
-    }
-
-}
-
-
-function ensureBackgroundLayers() {
-
-    if (
-        map.getSource(
-            "background-facilities"
-        )
-    ) {
-        return;
-    }
-
-
-    map.addSource(
-        "background-facilities",
-        {
-
-            type: "geojson",
-
-            data:
-                turf.featureCollection([])
-
-        }
-    );
-
-
-    map.addLayer({
-
-        id: "facilities-fill",
-
-        type: "fill",
-
-        source:
-            "background-facilities",
-
-        paint: {
-
-            "fill-color":
-                "#4f86c6",
-
-            "fill-opacity":
-                0.35
+          return;
 
         }
 
-    });
+
+        const searchExtent =
+          new Extent({
+
+            xmin:
+              Math.min(
+                topLeft.x,
+                bottomRight.x
+              ),
+
+            ymin:
+              Math.min(
+                topLeft.y,
+                bottomRight.y
+              ),
+
+            xmax:
+              Math.max(
+                topLeft.x,
+                bottomRight.x
+              ),
+
+            ymax:
+              Math.max(
+                topLeft.y,
+                bottomRight.y
+              ),
+
+            spatialReference:
+              view.spatialReference
+
+          });
 
 
-    map.addLayer({
-
-        id: "facilities-outline",
-
-        type: "line",
-
-        source:
-            "background-facilities",
-
-        paint: {
-
-            "line-color":
-                "#315b83",
-
-            "line-width":
-                1
-
-        }
-
-    });
-
-}
+        const query =
+          facilitiesLayer.createQuery();
 
 
-function setBackgroundVisibility(visible) {
-
-    const visibility =
-        visible
-            ? "visible"
-            : "none";
+        query.geometry =
+          searchExtent;
 
 
-    [
-        "facilities-fill",
-        "facilities-outline"
-
-    ].forEach(
-        layerID => {
-
-            if (map.getLayer(layerID)) {
-
-                map.setLayoutProperty(
-                    layerID,
-                    "visibility",
-                    visibility
-                );
-
-            }
-
-        }
-    );
+        query.spatialRelationship =
+          "intersects";
 
 
-    if (currentMode === "spider") {
-
-        facilityCounter.textContent =
-            spiderCache.length
-                ? `${spiderCache.length.toLocaleString()} facilities cached`
-                : "Spider cache";
-
-    }
-
-}
+        query.where =
+          getCurrentWhereClause();
 
 
-// ==========================================================
-// GENERIC PAGINATED QUERY
-// ==========================================================
-
-async function queryAllFacilitiesInEnvelope(
-    envelope,
-    whereClause = null
-) {
-
-    let offset = 0;
-
-    let allFeatures = [];
-
-    let keepGoing = true;
+        query.returnGeometry =
+          true;
 
 
-    while (keepGoing) {
-
-        const params =
-            new URLSearchParams({
-
-                where:
-                    whereClause ||
-                    buildWhereClause(),
-
-                geometry:
-                    envelope,
-
-                geometryType:
-                    "esriGeometryEnvelope",
-
-                inSR:
-                    "4326",
-
-                spatialRel:
-                    "esriSpatialRelIntersects",
-
-                outFields:
-                    "*",
-
-                returnGeometry:
-                    "true",
-
-                outSR:
-                    "4326",
-
-                resultOffset:
-                    String(offset),
-
-                resultRecordCount:
-                    String(PAGE_SIZE),
-
-                orderByFields:
-                    "OBJECTID ASC",
-
-                f:
-                    "geojson"
-
-            });
+        query.outFields = [
+          "OBJECTID",
+          "Sport",
+          "Infrastructure_Type",
+          "Surface",
+          "Floodlights",
+          "Owner",
+          "Facility_Size",
+          "Owner_Name",
+          "Quality",
+          "Local_Authority",
+          "LEA",
+          "Multi_Use",
+          "Area_msq"
+        ];
 
 
         const response =
-            await fetch(
-
-                FACILITIES_URL +
-                "/query?" +
-                params.toString()
-
-            );
+          await facilitiesLayer.queryFeatures(
+            query
+          );
 
 
-        if (!response.ok) {
-
-            throw new Error(
-                `ArcGIS returned ${response.status}`
-            );
-
-        }
-
-
-        const data =
-            await response.json();
-
-
-        if (!Array.isArray(data.features)) {
-
-            console.error(
-                "ArcGIS query response:",
-                data
-            );
-
-            throw new Error(
-                "ArcGIS query failed"
-            );
-
-        }
-
-
-        allFeatures.push(
-            ...data.features
-        );
-
-
-        console.log(
-            `Loaded batch: ${data.features.length}`
-        );
+        const nearbyFacilities =
+          response.features || [];
 
 
         if (
-            data.features.length <
-            PAGE_SIZE
+          nearbyFacilities.length === 0
         ) {
 
-            keepGoing = false;
+          clearSelection();
+
+          return;
 
         }
 
-        else {
 
-            offset += PAGE_SIZE;
+        const overlappingFacilities =
+          nearbyFacilities.filter(
+            function (facility) {
 
-        }
-
-    }
-
-
-    return allFeatures;
-
-}
+              if (!facility.geometry) {
+                return false;
+              }
 
 
-// ==========================================================
-// POINT SEARCH
-// ==========================================================
+              try {
 
-map.on("click", event => {
-
-    if (currentMode !== "point") {
-        return;
-    }
-
-
-    if (event.originalEvent?.shiftKey) {
-        return;
-    }
-
-
-    if (!sportSelect.value) {
-
-        statusElement.textContent =
-            "Choose a sport first.";
-
-        return;
-
-    }
-
-
-    searchPoint =
-        turf.point([
-
-            event.lngLat.lng,
-            event.lngLat.lat
-
-        ]);
-
-
-    if (searchMarker) {
-        searchMarker.remove();
-    }
-
-
-    const markerElement =
-        document.createElement("div");
-
-    markerElement.className =
-        "search-marker";
-
-
-    searchMarker =
-        new maplibregl.Marker({
-            element: markerElement
-        })
-            .setLngLat(event.lngLat)
-            .addTo(map);
-
-
-    runNearestSearch(
-        searchPoint,
-        Number(numberSelect.value)
-    );
-
-});
-
-
-// ==========================================================
-// NEAREST SEARCH
-// ==========================================================
-
-async function runNearestSearch(
-    point,
-    number
-) {
-
-    if (!sportSelect.value) {
-        return;
-    }
-
-
-    statusElement.textContent =
-        "Finding nearest facilities...";
-
-
-    const radii = [
-
-        5,
-        10,
-        20,
-        40,
-        80,
-        160,
-        300
-
-    ];
-
-
-    let candidates = [];
-
-
-    try {
-
-        for (const radius of radii) {
-
-            candidates =
-                await queryCandidates(
-                    point,
-                    radius
+                return (
+                  geometryEngine.intersects(
+                    facility.geometry,
+                    clickedPoint
+                  )
                 );
 
+              }
+              catch (error) {
 
-            console.log(
-                `${candidates.length} ${sportSelect.value} candidates within ${radius} km search box`
-            );
+                return false;
 
+              }
 
-            if (
-                candidates.length >=
-                number
-            ) {
-                break;
             }
-
-        }
+          );
 
 
         if (
-            candidates.length === 0
+          overlappingFacilities.length > 0
         ) {
 
-            statusElement.textContent =
-                "No matching facilities found.";
+          overlappingFacilities.sort(
+            function (a, b) {
 
-            clearSpiderGraphics();
+              return (
+                getPolygonArea(
+                  a.geometry
+                )
+                -
+                getPolygonArea(
+                  b.geometry
+                )
+              );
 
-            resultsElement.innerHTML =
-                "";
+            }
+          );
 
-            return;
+
+          selectFacilities(
+            overlappingFacilities
+          );
+
+
+          return;
 
         }
 
 
-        const ranked =
-            rankFacilities(
-                point,
-                candidates
-            );
+        let nearestFacility =
+          null;
 
 
-        const nearest =
-            ranked
-                .slice(0, number)
-                .map(
-                    item => item.feature
-                );
+        let nearestDistance =
+          Infinity;
 
 
-        drawSpider(nearest);
+        nearbyFacilities.forEach(
+          function (facility) {
 
-        displayResults(nearest);
-
-
-        statusElement.textContent =
-            `${nearest.length} nearest facilities found.`;
-
-
-        fitMapToResults(nearest);
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "Nearest search failed:",
-            error
-        );
-
-
-        statusElement.textContent =
-            "Search failed.";
-
-    }
-
-}
-
-
-// ==========================================================
-// SEARCH CANDIDATES
-// ==========================================================
-
-async function queryCandidates(
-    point,
-    radiusKm
-) {
-
-    const [
-        lng,
-        lat
-    ] =
-        point.geometry.coordinates;
-
-
-    const latDegrees =
-        radiusKm /
-        111.32;
-
-
-    const longitudeScale =
-        Math.max(
-
-            0.1,
-
-            Math.cos(
-                lat *
-                Math.PI /
-                180
-            )
-
-        );
-
-
-    const lngDegrees =
-        radiusKm /
-        (
-            111.32 *
-            longitudeScale
-        );
-
-
-    const envelope = [
-
-        lng - lngDegrees,
-        lat - latDegrees,
-        lng + lngDegrees,
-        lat + latDegrees
-
-    ].join(",");
-
-
-    return await queryAllFacilitiesInEnvelope(
-        envelope,
-        buildWhereClause()
-    );
-
-}
-
-
-// ==========================================================
-// DISTANCE RANKING
-// ==========================================================
-
-function rankFacilities(
-    point,
-    features
-) {
-
-    return features
-        .map(
-            feature => {
-
-                let distance;
-
-
-                try {
-
-                    distance =
-                        turf.pointToPolygonDistance(
-
-                            point,
-                            feature,
-
-                            {
-                                units:
-                                    "kilometers"
-                            }
-
-                        );
-
-
-                    distance =
-                        Math.max(
-                            0,
-                            distance
-                        );
-
-                }
-
-                catch (error) {
-
-                    const centre =
-                        turf.centroid(
-                            feature
-                        );
-
-
-                    distance =
-                        turf.distance(
-
-                            point,
-                            centre,
-
-                            {
-                                units:
-                                    "kilometers"
-                            }
-
-                        );
-
-                }
-
-
-                feature.properties =
-                    feature.properties ||
-                    {};
-
-
-                feature.properties._distanceKm =
-                    distance;
-
-
-                return {
-
-                    feature:
-                        feature,
-
-                    distance:
-                        distance
-
-                };
-
-            }
-        )
-        .sort(
-            (a, b) =>
-                a.distance -
-                b.distance
-        );
-
-}
-
-
-// ==========================================================
-// SPIDER GRAPHICS
-// ==========================================================
-
-function ensureSpiderLayers() {
-
-    if (!map.getSource("spider-lines")) {
-
-        map.addSource(
-            "spider-lines",
-            {
-
-                type: "geojson",
-
-                data:
-                    turf.featureCollection([])
-
-            }
-        );
-
-
-        map.addLayer({
-
-            id:
-                "spider-lines-layer",
-
-            type:
-                "line",
-
-            source:
-                "spider-lines",
-
-            paint: {
-
-                "line-color":
-                    "#222222",
-
-                "line-width":
-                    1.5,
-
-                "line-opacity":
-                    0.72
-
+            if (!facility.geometry) {
+              return;
             }
 
-        });
 
-    }
-
-
-    if (!map.getSource("nearest-facilities")) {
-
-        map.addSource(
-            "nearest-facilities",
-            {
-
-                type:
-                    "geojson",
-
-                data:
-                    turf.featureCollection([])
-
-            }
-        );
-
-
-        map.addLayer({
-
-            id:
-                "nearest-fill",
-
-            type:
-                "fill",
-
-            source:
-                "nearest-facilities",
-
-            paint: {
-
-                "fill-color":
-                    "#e36b2c",
-
-                "fill-opacity":
-                    0.72
-
-            }
-
-        });
-
-
-        map.addLayer({
-
-            id:
-                "nearest-outline",
-
-            type:
-                "line",
-
-            source:
-                "nearest-facilities",
-
-            paint: {
-
-                "line-color":
-                    "#9d3d13",
-
-                "line-width":
-                    2
-
-            }
-
-        });
-
-    }
-
-
-    if (!map.getSource("facility-labels")) {
-
-        map.addSource(
-            "facility-labels",
-            {
-
-                type:
-                    "geojson",
-
-                data:
-                    turf.featureCollection([])
-
-            }
-        );
-
-
-        map.addLayer({
-
-            id:
-                "facility-number-circles",
-
-            type:
-                "circle",
-
-            source:
-                "facility-labels",
-
-            paint: {
-
-                "circle-radius":
-                    9,
-
-                "circle-color":
-                    "#222222",
-
-                "circle-stroke-color":
-                    "#ffffff",
-
-                "circle-stroke-width":
-                    1.5
-
-            }
-
-        });
-
-
-        map.addLayer({
-
-            id:
-                "facility-numbers",
-
-            type:
-                "symbol",
-
-            source:
-                "facility-labels",
-
-            layout: {
-
-                "text-field":
-                    ["get", "label"],
-
-                "text-size":
-                    11,
-
-                "text-allow-overlap":
-                    true
-
-            },
-
-            paint: {
-
-                "text-color":
-                    "#ffffff"
-
-            }
-
-        });
-
-    }
-
-}
-
-
-function drawSpider(facilities) {
-
-    ensureSpiderLayers();
-
-
-    if (!searchPoint) {
-        return;
-    }
-
-
-    const lines = [];
-
-    const labels = [];
-
-
-    facilities.forEach(
-        (feature, index) => {
-
-            feature.properties =
-                feature.properties ||
-                {};
-
-
-            feature.properties._rank =
-                index + 1;
-
-
-            let centre;
+            let distance;
 
 
             try {
 
-                centre =
-                    turf.centroid(feature);
-
-            }
-
-            catch {
-
-                return;
-
-            }
-
-
-            lines.push(
-
-                turf.lineString(
-
-                    [
-
-                        searchPoint
-                            .geometry
-                            .coordinates,
-
-                        centre
-                            .geometry
-                            .coordinates
-
-                    ],
-
-                    {
-                        rank:
-                            index + 1
-                    }
-
-                )
-
-            );
-
-
-            centre.properties = {
-
-                rank:
-                    index + 1,
-
-                label:
-                    String(index + 1)
-
-            };
-
-
-            labels.push(centre);
-
-        }
-    );
-
-
-    map.getSource(
-        "nearest-facilities"
-    ).setData(
-        turf.featureCollection(facilities)
-    );
-
-
-    map.getSource(
-        "spider-lines"
-    ).setData(
-        turf.featureCollection(lines)
-    );
-
-
-    map.getSource(
-        "facility-labels"
-    ).setData(
-        turf.featureCollection(labels)
-    );
-
-}
-
-
-function clearSpiderGraphics() {
-
-    if (map.getSource("nearest-facilities")) {
-
-        map.getSource(
-            "nearest-facilities"
-        ).setData(
-            turf.featureCollection([])
-        );
-
-    }
-
-
-    if (map.getSource("spider-lines")) {
-
-        map.getSource(
-            "spider-lines"
-        ).setData(
-            turf.featureCollection([])
-        );
-
-    }
-
-
-    if (map.getSource("facility-labels")) {
-
-        map.getSource(
-            "facility-labels"
-        ).setData(
-            turf.featureCollection([])
-        );
-
-    }
-
-}
-
-
-// ==========================================================
-// ACCESS STATISTICS
-// ==========================================================
-
-function calculateAccessStatistics(
-    facilities
-) {
-
-    const distances =
-        facilities
-            .map(
-                feature =>
-                    Number(
-                        feature
-                            .properties
-                            ?._distanceKm
-                    )
-            )
-            .filter(
-                distance =>
-                    Number.isFinite(distance)
-            )
-            .sort(
-                (a, b) =>
-                    a - b
-            );
-
-
-    if (
-        distances.length === 0
-    ) {
-
-        return {
-
-            nearest:
-                null,
-
-            average:
-                null,
-
-            within5:
-                0,
-
-            within10:
-                0,
-
-            count:
-                0
-
-        };
-
-    }
-
-
-    const total =
-        distances.reduce(
-            (sum, distance) =>
-                sum + distance,
-            0
-        );
-
-
-    return {
-
-        nearest:
-            distances[0],
-
-        average:
-            total /
-            distances.length,
-
-        within5:
-            distances.filter(
-                distance =>
-                    distance <= 5
-            ).length,
-
-        within10:
-            distances.filter(
-                distance =>
-                    distance <= 10
-            ).length,
-
-        count:
-            distances.length
-
-    };
-
-}
-
-
-function buildAccessSummary(
-    facilities
-) {
-
-    const stats =
-        calculateAccessStatistics(
-            facilities
-        );
-
-
-    if (
-        stats.count === 0
-    ) {
-        return "";
-    }
-
-
-    const sport =
-        sportSelect.value ||
-        "facility";
-
-
-    return `
-
-        <div class="area-summary">
-
-            <div class="summary-header">
-
-                <strong>
-                    Access from this location
-                </strong>
-
-                <div class="summary-subtitle">
-                    Distance to the nearest ${escapeHtml(sport)} facilities
-                </div>
-
-            </div>
-
-
-            <div class="summary-grid">
-
-                ${summaryStat(
-                    formatDistance(
-                        stats.nearest
-                    ),
-                    "Nearest"
-                )}
-
-                ${summaryStat(
-                    formatDistance(
-                        stats.average
-                    ),
-                    `Avg. nearest ${stats.count}`
-                )}
-
-                ${summaryStat(
-                    stats.within5.toLocaleString(),
-                    "Within 5 km"
-                )}
-
-                ${summaryStat(
-                    stats.within10.toLocaleString(),
-                    "Within 10 km"
-                )}
-
-            </div>
-
-        </div>
-
-    `;
-
-}
-
-
-// ==========================================================
-// RESULTS
-// ==========================================================
-
-function displayResults(
-    facilities
-) {
-
-    if (
-        !facilities ||
-        facilities.length === 0
-    ) {
-
-        resultsElement.innerHTML =
-            "";
-
-        return;
-
-    }
-
-
-    const accessSummary =
-        buildAccessSummary(
-            facilities
-        );
-
-
-    const facilityRows =
-        facilities
-            .map(
-                (feature, index) => {
-
-                    const p =
-                        feature.properties ||
-                        {};
-
-
-                    const title =
-                        p.Owner_Name ||
-                        p.Infrastructure_Type ||
-                        p.Sport ||
-                        "Facility";
-
-
-                    const distance =
-                        Number(
-                            p._distanceKm
-                        );
-
-
-                    const distanceText =
-                        Number.isFinite(
-                            distance
-                        )
-                            ? formatDistance(
-                                distance
-                            )
-                            : "—";
-
-
-                    const area =
-                        getFacilityArea(
-                            feature
-                        );
-
-
-                    const details = [
-
-                        p.Infrastructure_Type,
-
-                        p.Surface,
-
-                        area
-                            ? `${Math.round(area).toLocaleString()} m²`
-                            : null,
-
-                        p.Quality
-                            ? qualityLabel(
-                                p.Quality
-                            )
-                            : null
-
-                    ]
-                        .filter(Boolean)
-                        .map(escapeHtml)
-                        .join(" • ");
-
-
-                    return `
-
-                        <div
-                            class="result-item"
-                            data-result-index="${index}"
-                        >
-
-                            <div class="result-header">
-
-                                <div class="result-number">
-                                    ${index + 1}
-                                </div>
-
-                                <div class="result-title">
-                                    ${escapeHtml(title)}
-                                </div>
-
-                            </div>
-
-                            <div class="result-details">
-
-                                <div class="result-distance">
-                                    ${escapeHtml(distanceText)}
-                                </div>
-
-                                <div>
-                                    ${details}
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    `;
-
-                }
-            )
-            .join("");
-
-
-    resultsElement.innerHTML =
-        accessSummary +
-        facilityRows;
-
-
-    resultsElement
-        .querySelectorAll(
-            ".result-item"
-        )
-        .forEach(
-            item => {
-
-                const index =
-                    Number(
-                        item.dataset.resultIndex
-                    );
-
-
-                const feature =
-                    facilities[index];
-
-
-                item.addEventListener(
-                    "mouseenter",
-                    () =>
-                        highlightResult(
-                            feature
-                        )
-                );
-
-
-                item.addEventListener(
-                    "mouseleave",
-                    clearHighlight
-                );
-
-
-                // ------------------------------------------
-                // CLICK RESULT:
-                // OPEN CARD + ZOOM TO FACILITY
-                // WORKS IN BOTH MODES
-                // ------------------------------------------
-
-                item.addEventListener(
-                    "click",
-                    () => {
-
-                        showFacilityCard(
-                            feature
-                        );
-
-                        zoomToFeature(
-                            feature
-                        );
-
-                    }
+              distance =
+                geometryEngine.distance(
+                  clickedPoint,
+                  facility.geometry
                 );
 
             }
-        );
+            catch (error) {
 
-}
-
-
-function formatDistance(
-    distanceKm
-) {
-
-    if (
-        distanceKm === null ||
-        distanceKm === undefined ||
-        !Number.isFinite(
-            Number(distanceKm)
-        )
-    ) {
-
-        return "—";
-
-    }
-
-
-    distanceKm =
-        Number(distanceKm);
-
-
-    if (distanceKm < 1) {
-
-        return `${Math.round(distanceKm * 1000)} m`;
-
-    }
-
-
-    return `${distanceKm.toFixed(2)} km`;
-
-}
-
-
-// ==========================================================
-// RESULT HIGHLIGHT
-// ==========================================================
-
-function highlightResult(feature) {
-
-    if (!feature) {
-        return;
-    }
-
-
-    if (!map.getSource("highlight-facility")) {
-
-        map.addSource(
-            "highlight-facility",
-            {
-
-                type:
-                    "geojson",
-
-                data:
-                    feature
-
-            }
-        );
-
-
-        map.addLayer({
-
-            id:
-                "highlight-fill",
-
-            type:
-                "fill",
-
-            source:
-                "highlight-facility",
-
-            paint: {
-
-                "fill-color":
-                    "#ff9a3d",
-
-                "fill-opacity":
-                    0.8
+              distance =
+                Infinity;
 
             }
 
-        });
 
+            if (
+              distance === null ||
+              distance === undefined ||
+              isNaN(distance)
+            ) {
 
-        map.addLayer({
-
-            id:
-                "highlight-outline",
-
-            type:
-                "line",
-
-            source:
-                "highlight-facility",
-
-            paint: {
-
-                "line-color":
-                    "#111111",
-
-                "line-width":
-                    3
+              distance =
+                Infinity;
 
             }
 
-        });
 
-    }
+            if (
+              distance <
+              nearestDistance
+            ) {
 
-    else {
+              nearestDistance =
+                distance;
 
-        map.getSource(
-            "highlight-facility"
-        ).setData(feature);
-
-    }
-
-}
-
-
-function clearHighlight() {
-
-    if (
-        map.getSource(
-            "highlight-facility"
-        )
-    ) {
-
-        map.getSource(
-            "highlight-facility"
-        ).setData(
-            turf.featureCollection([])
-        );
-
-    }
-
-}
-
-
-// ==========================================================
-// FIT / ZOOM
-// ==========================================================
-
-function fitMapToResults(
-    facilities
-) {
-
-    if (
-        !facilities ||
-        facilities.length === 0 ||
-        !searchPoint
-    ) {
-        return;
-    }
-
-
-    try {
-
-        const collection =
-            turf.featureCollection([
-
-                searchPoint,
-                ...facilities
-
-            ]);
-
-
-        const bbox =
-            turf.bbox(collection);
-
-
-        map.fitBounds(
-
-            [
-
-                [bbox[0], bbox[1]],
-                [bbox[2], bbox[3]]
-
-            ],
-
-            {
-
-                padding: {
-
-                    top:
-                        80,
-
-                    right:
-                        80,
-
-                    bottom:
-                        80,
-
-                    left:
-                        330
-
-                },
-
-                maxZoom:
-                    15,
-
-                duration:
-                    650
+              nearestFacility =
+                facility;
 
             }
 
-        );
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "Could not fit results:",
-            error
-        );
-
-    }
-
-}
-
-
-function zoomToFeature(feature) {
-
-    try {
-
-        const bbox =
-            turf.bbox(feature);
-
-
-        map.fitBounds(
-
-            [
-
-                [bbox[0], bbox[1]],
-                [bbox[2], bbox[3]]
-
-            ],
-
-            {
-
-                padding: {
-
-                    top:
-                        100,
-
-                    right:
-                        350,
-
-                    bottom:
-                        100,
-
-                    left:
-                        330
-
-                },
-
-                maxZoom:
-                    18,
-
-                duration:
-                    700
-
-            }
-
-        );
-
-    }
-
-    catch (error) {
-
-        console.warn(
-            "Could not zoom to facility:",
-            error
-        );
-
-    }
-
-}
-
-
-// ==========================================================
-// SPIDER MODE
-// ==========================================================
-
-async function activateSpiderMode() {
-
-    currentMode =
-        "spider";
-
-
-    backgroundRequestID++;
-
-
-    pointModeButton
-        .classList
-        .remove(
-            "active"
+          }
         );
 
 
-    spiderModeButton
-        .classList
-        .add(
-            "active"
-        );
+        if (!nearestFacility) {
 
-
-    spiderTarget
-        .classList
-        .remove(
-            "hidden"
-        );
-
-
-    spiderBadge
-        .classList
-        .remove(
-            "hidden"
-        );
-
-
-    numberGroup
-        .classList
-        .add(
-            "hidden"
-        );
-
-
-    modeDescription.textContent =
-        "Pan or zoom the map. The spider continuously follows the map centre.";
-
-
-    if (searchMarker) {
-
-        searchMarker.remove();
-
-        searchMarker = null;
-
-    }
-
-
-    setBackgroundVisibility(
-        false
-    );
-
-
-    clearResults();
-
-
-    spiderCache = [];
-    spiderCacheBounds = null;
-    spiderCacheKey = null;
-    spiderCacheLoading = false;
-
-
-    /*
-        IMPORTANT:
-
-        Spider Mode no longer disables any
-        MapLibre navigation controls.
-
-        Scroll zoom, double-click zoom,
-        touch zoom, keyboard controls and
-        +/- buttons all continue to work.
-    */
-
-
-    statusElement.textContent =
-        sportSelect.value
-            ? "Preparing Spider Mode..."
-            : "Choose a sport to start Spider Mode.";
-
-
-    if (sportSelect.value) {
-
-        await buildSpiderCache();
-
-        updateLiveSpider();
-
-    }
-
-}
-
-
-// ==========================================================
-// POINT MODE
-// ==========================================================
-
-function activatePointMode() {
-
-    currentMode =
-        "point";
-
-
-    spiderCacheBuildID++;
-
-    spiderCacheLoading =
-        false;
-
-
-    pointModeButton
-        .classList
-        .add(
-            "active"
-        );
-
-
-    spiderModeButton
-        .classList
-        .remove(
-            "active"
-        );
-
-
-    spiderTarget
-        .classList
-        .add(
-            "hidden"
-        );
-
-
-    spiderBadge
-        .classList
-        .add(
-            "hidden"
-        );
-
-
-    numberGroup
-        .classList
-        .remove(
-            "hidden"
-        );
-
-
-    modeDescription.textContent =
-        "Choose a sport, then click anywhere on the map.";
-
-
-    /*
-        Ensure normal navigation is enabled.
-    */
-
-    map.scrollZoom.enable();
-
-    map.doubleClickZoom.enable();
-
-    map.touchZoomRotate.enable();
-
-    map.boxZoom.enable();
-
-    map.keyboard.enable();
-
-
-    clearResults();
-
-    clearSpiderGraphics();
-
-
-    setBackgroundVisibility(
-        true
-    );
-
-
-    statusElement.textContent =
-        sportSelect.value
-            ? "Click anywhere on the map."
-            : "Choose a sport to begin.";
-
-
-    loadVisibleFacilities();
-
-}
-
-
-// ==========================================================
-// SPIDER REGIONAL CACHE
-// ==========================================================
-
-async function buildSpiderCache() {
-
-    if (
-        currentMode !== "spider" ||
-        !sportSelect.value ||
-        spiderCacheLoading
-    ) {
-        return;
-    }
-
-
-    spiderCacheLoading =
-        true;
-
-
-    const buildID =
-        ++spiderCacheBuildID;
-
-
-    const centre =
-        map.getCenter();
-
-
-    const radiusKm =
-        SPIDER_CACHE_RADIUS_KM;
-
-
-    const latDegrees =
-        radiusKm /
-        111.32;
-
-
-    const longitudeScale =
-        Math.max(
-
-            0.1,
-
-            Math.cos(
-                centre.lat *
-                Math.PI /
-                180
-            )
-
-        );
-
-
-    const lngDegrees =
-        radiusKm /
-        (
-            111.32 *
-            longitudeScale
-        );
-
-
-    const envelope = [
-
-        centre.lng - lngDegrees,
-        centre.lat - latDegrees,
-        centre.lng + lngDegrees,
-        centre.lat + latDegrees
-
-    ].join(",");
-
-
-    /*
-        The downloaded cache covers 45 km.
-
-        We rebuild it before the map centre
-        reaches the edge of that cache.
-    */
-
-    const proposedBounds = {
-
-        west:
-            centre.lng -
-            lngDegrees *
-            0.55,
-
-        east:
-            centre.lng +
-            lngDegrees *
-            0.55,
-
-        south:
-            centre.lat -
-            latDegrees *
-            0.55,
-
-        north:
-            centre.lat +
-            latDegrees *
-            0.55
-
-    };
-
-
-    const newCacheKey =
-        getSpiderFilterKey();
-
-
-    statusElement.textContent =
-        "Loading regional Spider cache...";
-
-
-    try {
-
-        const features =
-            await queryAllFacilitiesInEnvelope(
-
-                envelope,
-                buildWhereClause()
-
-            );
-
-
-        if (
-            buildID !==
-            spiderCacheBuildID ||
-            currentMode !==
-            "spider"
-        ) {
-
-            return;
+          nearestFacility =
+            nearbyFacilities[0];
 
         }
 
 
-        if (
-            newCacheKey !==
-            getSpiderFilterKey()
-        ) {
-
-            return;
-
-        }
-
-
-        spiderCache =
-            features;
-
-
-        spiderCacheBounds =
-            proposedBounds;
-
-
-        spiderCacheKey =
-            newCacheKey;
-
-
-        console.log(
-            `Spider cache ready: ${spiderCache.length} facilities`
+        selectFacilities(
+          [
+            nearestFacility
+          ]
         );
 
-
-        facilityCounter.textContent =
-            `${spiderCache.length.toLocaleString()} facilities cached`;
-
-
-        if (
-            spiderCache.length === 0
-        ) {
-
-            statusElement.textContent =
-                "No matching facilities in this region.";
-
-            clearSpiderGraphics();
-
-            resultsElement.innerHTML =
-                "";
-
-            return;
-
-        }
-
-
-        statusElement.textContent =
-            `${spiderCache.length.toLocaleString()} facilities cached • pan or zoom to explore`;
-
-
-        updateLiveSpider();
-
-    }
-
-    catch (error) {
+      }
+      catch (error) {
 
         console.error(
-            "Spider cache failed:",
-            error
+          "FACILITY SELECTION ERROR:",
+          error
         );
 
-
-        statusElement.textContent =
-            "Could not load Spider facilities.";
+      }
 
     }
-
-    finally {
-
-        if (
-            buildID ===
-            spiderCacheBuildID
-        ) {
-
-            spiderCacheLoading =
-                false;
-
-        }
-
-    }
-
-}
+  );
 
 
-// ==========================================================
-// LIVE SPIDER
-// ==========================================================
+  // =========================================================
+  // SELECT FACILITIES
+  // =========================================================
 
-function updateLiveSpider() {
+  function selectFacilities(
+    graphics
+  ) {
+
+    clearMapHighlightsOnly();
+
+
+    selectedGraphics =
+      graphics || [];
+
 
     if (
-        currentMode !== "spider" ||
-        !sportSelect.value ||
-        spiderCache.length === 0
+      selectedGraphics.length === 0
     ) {
-        return;
+
+      clearSelection();
+
+      return;
+
     }
 
 
-    const centre =
-        map.getCenter();
+    selectedIndex =
+      0;
 
 
-    const point =
-        turf.point([
+    if (facilitiesLayerView) {
 
-            centre.lng,
-            centre.lat
+      const objectIds =
+        selectedGraphics
 
-        ]);
+          .map(
+            function (graphic) {
+
+              return graphic.getObjectId();
+
+            }
+          )
+
+          .filter(
+            function (objectId) {
+
+              return (
+                objectId !== null &&
+                objectId !== undefined
+              );
+
+            }
+          );
 
 
-    /*
-        In Spider Mode the centre of the
-        screen is always the search point.
-    */
+      if (
+        objectIds.length > 0
+      ) {
 
-    searchPoint =
-        point;
+        highlightHandle =
+          facilitiesLayerView.highlight(
+            objectIds
+          );
+
+      }
+
+    }
 
 
-    const ranked =
-        rankFacilities(
-            point,
-            spiderCache
+    showCurrentFacility();
+
+  }
+
+
+  // =========================================================
+  // SHOW CURRENT FACILITY
+  // =========================================================
+
+  function showCurrentFacility() {
+
+    if (
+      selectedGraphics.length === 0
+    ) {
+
+      clearSelection();
+
+      return;
+
+    }
+
+
+    selectedGraphic =
+      selectedGraphics[
+        selectedIndex
+      ];
+
+
+    updateCurrentOverlay();
+
+
+    showFacilityDetails(
+      selectedGraphic.attributes
+    );
+
+
+    updateSelectionNavigator();
+
+  }
+
+
+  // =========================================================
+  // CURRENT FACILITY STRONG OUTLINE
+  // =========================================================
+
+  function updateCurrentOverlay() {
+
+    if (currentOverlayGraphic) {
+
+      view.graphics.remove(
+        currentOverlayGraphic
+      );
+
+
+      currentOverlayGraphic =
+        null;
+
+    }
+
+
+    if (
+      !selectedGraphic ||
+      !selectedGraphic.geometry
+    ) {
+
+      return;
+
+    }
+
+
+    currentOverlayGraphic =
+      selectedGraphic.clone();
+
+
+    currentOverlayGraphic.symbol = {
+      type: "simple-fill",
+
+      color: [
+        0,
+        170,
+        150,
+        0.06
+      ],
+
+      outline: {
+        color: [
+          0,
+          90,
+          75,
+          1
+        ],
+
+        width: 4
+      }
+    };
+
+
+    view.graphics.add(
+      currentOverlayGraphic
+    );
+
+  }
+
+
+  // =========================================================
+  // NAVIGATOR
+  // =========================================================
+
+  function updateSelectionNavigator() {
+
+    if (
+      selectedGraphics.length > 1
+    ) {
+
+      selectionNavigator.classList.remove(
+        "hidden"
+      );
+
+
+      selectionPosition.textContent =
+        (
+          selectedIndex + 1
+        )
+        +
+        " of "
+        +
+        selectedGraphics.length;
+
+    }
+    else {
+
+      selectionNavigator.classList.add(
+        "hidden"
+      );
+
+    }
+
+  }
+
+
+  if (previousFacility) {
+
+    previousFacility.addEventListener(
+      "click",
+      function () {
+
+        if (
+          selectedGraphics.length <= 1
+        ) {
+          return;
+        }
+
+
+        selectedIndex =
+          (
+            selectedIndex -
+            1 +
+            selectedGraphics.length
+          )
+          %
+          selectedGraphics.length;
+
+
+        showCurrentFacility();
+
+      }
+    );
+
+  }
+
+
+  if (nextFacility) {
+
+    nextFacility.addEventListener(
+      "click",
+      function () {
+
+        if (
+          selectedGraphics.length <= 1
+        ) {
+          return;
+        }
+
+
+        selectedIndex =
+          (
+            selectedIndex +
+            1
+          )
+          %
+          selectedGraphics.length;
+
+
+        showCurrentFacility();
+
+      }
+    );
+
+  }
+
+
+  // =========================================================
+  // POLYGON AREA
+  // =========================================================
+
+  function getPolygonArea(
+    geometry
+  ) {
+
+    if (!geometry) {
+      return Infinity;
+    }
+
+
+    try {
+
+      const area =
+        Math.abs(
+          geometryEngine.geodesicArea(
+            geometry,
+            "square-meters"
+          )
         );
 
 
-    const nearest =
-        ranked
-            .slice(
-                0,
-                SPIDER_COUNT
-            )
-            .map(
-                item => item.feature
-            );
+      if (
+        isFinite(area) &&
+        area > 0
+      ) {
 
+        return area;
 
-    drawSpider(nearest);
+      }
 
-    displayResults(nearest);
-
-}
-
-
-// ==========================================================
-// SPIDER CACHE HELPERS
-// ==========================================================
-
-function getSpiderFilterKey() {
-
-    return [
-
-        sportSelect.value,
-        typeSelect.value,
-        surfaceSelect.value,
-        sizeSelect.value,
-        floodlightsSelect.value,
-        ownerSelect.value,
-        qualitySelect.value
-
-    ].join("|");
-
-}
-
-
-function spiderCentreInsideCache() {
-
-    if (!spiderCacheBounds) {
-        return false;
+    }
+    catch (error) {
+      // fallback below
     }
 
 
-    const centre =
-        map.getCenter();
+    if (geometry.extent) {
+
+      return (
+        geometry.extent.width *
+        geometry.extent.height
+      );
+
+    }
+
+
+    return Infinity;
+
+  }
+
+
+  // =========================================================
+  // FACILITY DETAILS
+  // =========================================================
+
+  function showFacilityDetails(
+    attributes
+  ) {
+
+    if (!attributes) {
+      return;
+    }
+
+
+    let title =
+      cleanValue(
+        attributes.Owner_Name
+      );
+
+
+    if (
+      title ===
+      "Not recorded"
+    ) {
+
+      const sport =
+        cleanValue(
+          attributes.Sport
+        );
+
+
+      const type =
+        cleanValue(
+          attributes.Infrastructure_Type
+        );
+
+
+      title =
+        sport !== "Not recorded" &&
+        type !== "Not recorded"
+
+          ? sport +
+            " - " +
+            type
+
+          : sport +
+            " facility";
+
+    }
+
+
+    setText(
+      "detailTitle",
+      title
+    );
+
+
+    setText(
+      "detailSportTag",
+      displaySportName(
+        attributes.Sport
+      )
+    );
+
+
+    setSportTagColour(
+      attributes.Sport
+    );
+
+
+    setText(
+      "detailTypeTag",
+      cleanValue(
+        attributes.Infrastructure_Type
+      )
+    );
+
+
+    setText(
+      "detailSport",
+      displaySportName(
+        attributes.Sport
+      )
+    );
+
+
+    setText(
+      "detailInfrastructure",
+      cleanValue(
+        attributes.Infrastructure_Type
+      )
+    );
+
+
+    setText(
+      "detailSurface",
+      cleanValue(
+        attributes.Surface
+      )
+    );
+
+
+    setText(
+      "detailFloodlights",
+      formatFloodlights(
+        attributes.Floodlights
+      )
+    );
+
+
+    setText(
+      "detailOwner",
+      cleanValue(
+        attributes.Owner
+      )
+    );
+
+
+    setText(
+      "detailOwnerName",
+      cleanValue(
+        attributes.Owner_Name
+      )
+    );
+
+
+    setText(
+      "detailSize",
+      cleanValue(
+        attributes.Facility_Size
+      )
+    );
+
+
+    setText(
+      "detailQuality",
+      formatQuality(
+        attributes.Quality
+      )
+    );
+
+
+    setText(
+      "detailMultiUse",
+      cleanValue(
+        attributes.Multi_Use
+      )
+    );
+
+
+    setText(
+      "detailLA",
+      titleCase(
+        attributes.Local_Authority
+      )
+    );
+
+
+    setText(
+      "detailLEA",
+      titleCase(
+        attributes.LEA
+      )
+    );
+
+
+    setText(
+      "detailArea",
+      formatArea(
+        attributes.Area_msq
+      )
+    );
+
+
+    if (emptyState) {
+
+      emptyState.classList.add(
+        "hidden"
+      );
+
+    }
+
+
+    if (facilityDetails) {
+
+      facilityDetails.classList.remove(
+        "hidden"
+      );
+
+    }
+
+  }
+
+
+  // =========================================================
+  // SPORT DISPLAY
+  // =========================================================
+
+  function displaySportName(
+    value
+  ) {
+
+    if (
+      value ===
+      "Sports Hall"
+    ) {
+
+      return "Sports Halls";
+
+    }
+
+
+    return cleanValue(
+      value
+    );
+
+  }
+
+
+  // =========================================================
+  // SPORT TAG COLOUR
+  // =========================================================
+
+  function setSportTagColour(
+    sport
+  ) {
+
+    const tag =
+      document.getElementById(
+        "detailSportTag"
+      );
+
+
+    if (!tag) {
+      return;
+    }
+
+
+    const colour =
+      sportColours[
+        sport
+      ]
+      ||
+      [
+        130,
+        130,
+        130
+      ];
+
+
+    tag.style.backgroundColor =
+      "rgb(" +
+      colour[0] +
+      "," +
+      colour[1] +
+      "," +
+      colour[2] +
+      ")";
+
+  }
+
+
+  // =========================================================
+  // FORMATTERS
+  // =========================================================
+
+  function formatQuality(
+    value
+  ) {
+
+    const labels = {
+      1: "Poor",
+      2: "Good / Satisfactory",
+      3: "Excellent"
+    };
 
 
     return (
-
-        centre.lng >
-            spiderCacheBounds.west &&
-
-        centre.lng <
-            spiderCacheBounds.east &&
-
-        centre.lat >
-            spiderCacheBounds.south &&
-
-        centre.lat <
-            spiderCacheBounds.north
-
+      labels[value] ||
+      cleanValue(
+        value
+      )
     );
 
-}
+  }
 
 
-// ==========================================================
-// MAP MOVEMENT
-// ==========================================================
-
-map.on("move", () => {
+  function formatFloodlights(
+    value
+  ) {
 
     if (
-        currentMode !==
-        "spider"
+      value ===
+      "Floodlights"
     ) {
-        return;
+
+      return "Yes";
+
     }
 
 
-    const now =
-        performance.now();
-
-
     if (
-        now -
-        lastSpiderFrame <
-        SPIDER_FRAME_INTERVAL
+      value ===
+      "No Floodlights"
     ) {
-        return;
+
+      return "No";
+
     }
 
 
-    lastSpiderFrame =
-        now;
+    return cleanValue(
+      value
+    );
+
+  }
 
 
-    /*
-        "move" fires for BOTH pan and zoom,
-        so the spider follows the map centre
-        continuously during either action.
-    */
+  function titleCase(
+    value
+  ) {
 
-    updateLiveSpider();
+    const cleaned =
+      cleanValue(
+        value
+      );
 
-});
-
-
-map.on("moveend", async () => {
 
     if (
-        currentMode ===
-        "spider"
+      cleaned ===
+      "Not recorded"
     ) {
 
-        updateLiveSpider();
+      return cleaned;
+
+    }
 
 
-        /*
-            If the user has travelled outside
-            the safe part of the regional cache,
-            download a new cache around the
-            current map centre.
-        */
+    return cleaned
+      .toLowerCase()
+      .replace(
+        /\b\w/g,
+        function (letter) {
+
+          return letter.toUpperCase();
+
+        }
+      );
+
+  }
+
+
+  // =========================================================
+  // CLEAR MAP HIGHLIGHTS
+  // =========================================================
+
+  function clearMapHighlightsOnly() {
+
+    if (highlightHandle) {
+
+      highlightHandle.remove();
+
+      highlightHandle =
+        null;
+
+    }
+
+
+    if (currentOverlayGraphic) {
+
+      view.graphics.remove(
+        currentOverlayGraphic
+      );
+
+      currentOverlayGraphic =
+        null;
+
+    }
+
+  }
+
+
+  // =========================================================
+  // CLEAR SELECTION
+  // =========================================================
+
+  function clearSelection() {
+
+    clearMapHighlightsOnly();
+
+
+    selectedGraphics =
+      [];
+
+    selectedIndex =
+      0;
+
+    selectedGraphic =
+      null;
+
+
+    if (selectionNavigator) {
+
+      selectionNavigator.classList.add(
+        "hidden"
+      );
+
+    }
+
+
+    if (facilityDetails) {
+
+      facilityDetails.classList.add(
+        "hidden"
+      );
+
+    }
+
+
+    if (emptyState) {
+
+      emptyState.classList.remove(
+        "hidden"
+      );
+
+    }
+
+  }
+
+
+  // =========================================================
+  // CLOSE
+  // =========================================================
+
+  if (closeDetails) {
+
+    closeDetails.addEventListener(
+      "click",
+      clearSelection
+    );
+
+  }
+
+
+  // =========================================================
+  // ZOOM TO CURRENT FACILITY
+  // =========================================================
+
+  if (zoomToFacility) {
+
+    zoomToFacility.addEventListener(
+      "click",
+      async function () {
 
         if (
-            !spiderCentreInsideCache() &&
-            !spiderCacheLoading &&
-            sportSelect.value
+          !selectedGraphic ||
+          !selectedGraphic.geometry
         ) {
 
-            await buildSpiderCache();
+          return;
 
         }
 
-    }
 
-    else {
+        try {
 
-        loadVisibleFacilities();
-
-    }
-
-});
+          const geometry =
+            selectedGraphic.geometry;
 
 
-// ==========================================================
-// MODE BUTTONS
-// ==========================================================
+          const target =
+            geometry.extent
 
-pointModeButton.addEventListener(
-    "click",
-    activatePointMode
-);
+              ? geometry.extent.expand(
+                  2.2
+                )
 
-
-spiderModeButton.addEventListener(
-    "click",
-    activateSpiderMode
-);
+              : geometry;
 
 
-// ==========================================================
-// FILTER CHANGES
-// ==========================================================
-
-const searchControls = [
-
-    sportSelect,
-    typeSelect,
-    surfaceSelect,
-    sizeSelect,
-    floodlightsSelect,
-    ownerSelect,
-    qualitySelect
-
-];
+          view.padding = {
+            top: 20,
+            right: 140,
+            bottom: 20,
+            left: 20
+          };
 
 
-searchControls.forEach(
-    control => {
-
-        control.addEventListener(
-            "change",
-            async () => {
-
-                areaSummary
-                    .classList
-                    .add(
-                        "hidden"
-                    );
-
-
-                hideFacilityCard();
-
-
-                if (
-                    currentMode ===
-                    "spider"
-                ) {
-
-                    /*
-                        Invalidate any old cache request.
-                    */
-
-                    spiderCacheBuildID++;
-
-
-                    spiderCache = [];
-                    spiderCacheBounds = null;
-                    spiderCacheKey = null;
-                    spiderCacheLoading = false;
-
-
-                    clearResults();
-
-
-                    if (
-                        sportSelect.value
-                    ) {
-
-                        statusElement.textContent =
-                            "Updating Spider facilities...";
-
-
-                        await buildSpiderCache();
-
-                    }
-
-                    else {
-
-                        statusElement.textContent =
-                            "Choose a sport to start Spider Mode.";
-
-                        facilityCounter.textContent =
-                            "Spider cache";
-
-                    }
-
-                }
-
-                else {
-
-                    clearResults();
-
-
-                    statusElement.textContent =
-                        sportSelect.value
-                            ? "Click anywhere on the map."
-                            : "Choose a sport to begin.";
-
-                }
-
+          await view.goTo(
+            target,
+            {
+              duration: 800
             }
-        );
+          );
 
-    }
-);
+        }
+        catch (error) {
 
+          if (
+            error.name !==
+            "AbortError"
+          ) {
 
-// ==========================================================
-// CLEAR
-// ==========================================================
-
-clearButton.addEventListener(
-    "click",
-    () => {
-
-        clearResults();
-
-        hideFacilityCard();
-
-
-        areaSummary
-            .classList
-            .add(
-                "hidden"
+            console.error(
+              "ZOOM ERROR:",
+              error
             );
 
-
-        if (searchMarker) {
-
-            searchMarker.remove();
-
-            searchMarker = null;
+          }
 
         }
 
+      }
+    );
 
-        if (
-            currentMode ===
-            "spider"
-        ) {
+  }
 
-            if (
-                sportSelect.value &&
-                spiderCache.length
-            ) {
 
-                updateLiveSpider();
+  // =========================================================
+  // FULL IRELAND
+  // =========================================================
 
+  if (homeButton) {
+
+    homeButton.addEventListener(
+      "click",
+      async function () {
+
+        try {
+
+          view.padding = {
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0
+          };
+
+
+          await view.goTo(
+            {
+              center:
+                IRELAND_CENTER,
+
+              zoom:
+                IRELAND_ZOOM
+            },
+            {
+              duration:
+                900
             }
+          );
 
+        }
+        catch (error) {
 
-            statusElement.textContent =
-                sportSelect.value
-                    ? "Pan or zoom the map to explore."
-                    : "Choose a sport to start Spider Mode.";
+          if (
+            error.name !==
+            "AbortError"
+          ) {
+
+            console.error(
+              "HOME VIEW ERROR:",
+              error
+            );
+
+          }
 
         }
 
-        else {
+      }
+    );
 
-            statusElement.textContent =
-                sportSelect.value
-                    ? "Click anywhere on the map."
-                    : "Choose a sport to begin.";
+  }
 
-        }
+
+  // =========================================================
+  // GENERIC HELPERS
+  // =========================================================
+
+  function setText(
+    id,
+    value
+  ) {
+
+    const element =
+      document.getElementById(
+        id
+      );
+
+
+    if (element) {
+
+      element.textContent =
+        value;
 
     }
-);
+
+  }
 
 
-function clearResults() {
+  function cleanValue(
+    value
+  ) {
 
-    resultsElement.innerHTML =
-        "";
+    if (
+      value === null ||
+      value === undefined ||
+      value === "" ||
+      value === " " ||
+      value === "NULL"
+    ) {
 
-    clearSpiderGraphics();
+      return "Not recorded";
 
-    clearHighlight();
-
-}
-
-
-// ==========================================================
-// FACILITY INFORMATION CARD
-// ==========================================================
-
-function showFacilityCard(feature) {
-
-    if (!feature) {
-        return;
     }
 
 
-    const p =
-        feature.properties ||
-        {};
+    return String(
+      value
+    );
+
+  }
 
 
-    const name =
-        p.Owner_Name ||
-        p.Infrastructure_Type ||
-        p.Sport ||
-        "Sports Facility";
+  function formatArea(
+    value
+  ) {
 
+    if (
+      value === null ||
+      value === undefined ||
+      value === "" ||
+      isNaN(
+        Number(value)
+      )
+    ) {
 
-    const sport =
-        p.Sport ||
-        "Sport not recorded";
+      return "Not recorded";
+
+    }
 
 
     const area =
-        getFacilityArea(feature);
-
-
-    facilityCardContent.innerHTML = `
-
-        <div class="facility-name">
-            ${escapeHtml(name)}
-        </div>
-
-        <div class="facility-sport">
-            ${escapeHtml(sport)}
-        </div>
-
-
-        <div class="facility-info-grid">
-
-            ${facilityInfoItem(
-                "Type",
-                p.Infrastructure_Type
-            )}
-
-            ${facilityInfoItem(
-                "Surface",
-                p.Surface
-            )}
-
-            ${facilityInfoItem(
-                "Size",
-                p.Size ||
-                p.Facility_Size
-            )}
-
-            ${facilityInfoItem(
-                "Floodlights",
-                p.Floodlights
-            )}
-
-            ${facilityInfoItem(
-                "Owner",
-                p.Owner
-            )}
-
-            ${facilityInfoItem(
-                "Quality",
-                qualityLabel(
-                    p.Quality
-                )
-            )}
-
-            ${facilityInfoItem(
-                "Usage",
-                p.Multi_Use
-            )}
-
-            ${facilityInfoItem(
-                "Area",
-                area
-                    ? `${Math.round(area).toLocaleString()} m²`
-                    : null
-            )}
-
-        </div>
-
-
-        <div class="facility-location">
-
-            ${
-                p.LEA
-                    ? `
-                        <strong>LEA:</strong>
-                        ${escapeHtml(p.LEA)}
-                        <br>
-                    `
-                    : ""
-            }
-
-            ${
-                p.Local_Authority
-                    ? `
-                        <strong>Local Authority:</strong>
-                        ${escapeHtml(p.Local_Authority)}
-                    `
-                    : ""
-            }
-
-        </div>
-
-
-        ${
-            p.GlobalID
-                ? `
-                    <div class="facility-id">
-                        ${escapeHtml(p.GlobalID)}
-                    </div>
-                `
-                : ""
-        }
-
-    `;
-
-
-    facilityCard
-        .classList
-        .remove(
-            "hidden"
-        );
-
-}
-
-
-function facilityInfoItem(
-    label,
-    value
-) {
-
-    const displayValue =
-        value !== null &&
-        value !== undefined &&
-        value !== ""
-            ? value
-            : "Not recorded";
-
-
-    return `
-
-        <div class="facility-info-item">
-
-            <span class="facility-info-label">
-                ${escapeHtml(label)}
-            </span>
-
-            <span class="facility-info-value">
-                ${escapeHtml(displayValue)}
-            </span>
-
-        </div>
-
-    `;
-
-}
-
-
-function hideFacilityCard() {
-
-    facilityCard
-        .classList
-        .add(
-            "hidden"
-        );
-
-}
-
-
-closeFacilityCard.addEventListener(
-    "click",
-    hideFacilityCard
-);
-
-
-// ==========================================================
-// FACILITY AREA
-// ==========================================================
-
-function getFacilityArea(feature) {
-
-    const p =
-        feature.properties ||
-        {};
-
-
-    const areaMSQ =
-        Number(
-            p.Area_msq
-        );
+      Number(value);
 
 
     if (
-        Number.isFinite(areaMSQ) &&
-        areaMSQ > 0
+      area >=
+      10000
     ) {
 
-        return areaMSQ;
-
-    }
-
-
-    const shapeArea =
-        Number(
-            p.Shape__Area
-        );
-
-
-    if (
-        Number.isFinite(shapeArea) &&
-        shapeArea > 0
-    ) {
-
-        return shapeArea;
-
-    }
-
-
-    try {
-
-        return turf.area(feature);
-
-    }
-
-    catch {
-
-        return null;
-
-    }
-
-}
-
-
-// ==========================================================
-// FACILITY CLICK EVENTS
-// ==========================================================
-
-map.on(
-    "click",
-    "facilities-fill",
-    event => {
-
-        /*
-            In Point Mode a normal click is
-            reserved for creating the search
-            point.
-
-            Shift-click opens the facility card.
-        */
-
-        if (
-            currentMode === "point" &&
-            !event.originalEvent?.shiftKey
-        ) {
-            return;
-        }
-
-
-        const feature =
-            event.features?.[0];
-
-
-        if (feature) {
-
-            showFacilityCard(
-                feature
-            );
-
-        }
-
-    }
-);
-
-
-map.on(
-    "mouseenter",
-    "facilities-fill",
-    () => {
-
-        map.getCanvas()
-            .style
-            .cursor =
-                "pointer";
-
-    }
-);
-
-
-map.on(
-    "mouseleave",
-    "facilities-fill",
-    () => {
-
-        map.getCanvas()
-            .style
-            .cursor =
-                "";
-
-    }
-);
-
-
-// ==========================================================
-// CLICK HIGHLIGHTED SPIDER FACILITY
-// ==========================================================
-
-map.on(
-    "click",
-    "nearest-fill",
-    event => {
-
-        const feature =
-            event.features?.[0];
-
-
-        if (!feature) {
-            return;
-        }
-
-
-        /*
-            Open facility information.
-        */
-
-        showFacilityCard(
-            feature
-        );
-
-
-        /*
-            Zoom directly to the selected
-            highlighted facility.
-
-            Spider Mode remains active.
-        */
-
-        zoomToFeature(
-            feature
-        );
-
-    }
-);
-
-
-map.on(
-    "mouseenter",
-    "nearest-fill",
-    () => {
-
-        map.getCanvas()
-            .style
-            .cursor =
-                "pointer";
-
-    }
-);
-
-
-map.on(
-    "mouseleave",
-    "nearest-fill",
-    () => {
-
-        map.getCanvas()
-            .style
-            .cursor =
-                "";
-
-    }
-);
-
-
-// ==========================================================
-// AREA SUMMARY
-// ==========================================================
-
-areaSummaryButton.addEventListener(
-    "click",
-    runAreaSummary
-);
-
-
-async function runAreaSummary() {
-
-    areaSummaryButton.disabled =
-        true;
-
-
-    areaSummaryButton.textContent =
-        "Analysing...";
-
-
-    const bounds =
-        map.getBounds();
-
-
-    const envelope = [
-
-        bounds.getWest(),
-        bounds.getSouth(),
-        bounds.getEast(),
-        bounds.getNorth()
-
-    ].join(",");
-
-
-    try {
-
-        const features =
-            await queryAllFacilitiesInEnvelope(
-
-                envelope,
-                buildWhereClause()
-
-            );
-
-
-        displayAreaSummary(
-            features
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "Area summary failed:",
-            error
-        );
-
-
-        areaSummary.innerHTML = `
-
-            <div class="summary-header">
-
-                <strong>
-                    Analysis unavailable
-                </strong>
-
-                <div class="summary-subtitle">
-                    The facilities could not be loaded.
-                </div>
-
-            </div>
-
-        `;
-
-
-        areaSummary
-            .classList
-            .remove(
-                "hidden"
-            );
-
-    }
-
-    finally {
-
-        areaSummaryButton.disabled =
-            false;
-
-
-        areaSummaryButton.textContent =
-            "📊 Summarise View";
-
-    }
-
-}
-
-
-// ==========================================================
-// AREA SUMMARY STATISTICS
-// ==========================================================
-
-function displayAreaSummary(features) {
-
-    const count =
-        features.length;
-
-
-    if (count === 0) {
-
-        areaSummary.innerHTML = `
-
-            <div class="summary-header">
-
-                <strong>
-                    No facilities found
-                </strong>
-
-                <div class="summary-subtitle">
-                    Try changing the filters or viewing a larger area.
-                </div>
-
-            </div>
-
-        `;
-
-
-        areaSummary
-            .classList
-            .remove(
-                "hidden"
-            );
-
-
-        return;
-
-    }
-
-
-    let totalArea = 0;
-
-    let floodlit = 0;
-
-    let synthetic = 0;
-
-    let multiUse = 0;
-
-
-    const sportCounts = {};
-
-
-    features.forEach(
-        feature => {
-
-            const p =
-                feature.properties ||
-                {};
-
-
-            const sport =
-                p.Sport ||
-                "Unknown";
-
-
-            sportCounts[sport] =
-                (
-                    sportCounts[sport] ||
-                    0
-                ) + 1;
-
-
-            const area =
-                getFacilityArea(feature);
-
-
-            if (
-                Number.isFinite(area) &&
-                area > 0
-            ) {
-
-                totalArea += area;
-
-            }
-
-
-            const floodlightValue =
-                String(
-                    p.Floodlights ||
-                    ""
-                )
-                    .trim()
-                    .toLowerCase();
-
-
-            if (
-                floodlightValue ===
-                "floodlights"
-            ) {
-
-                floodlit++;
-
-            }
-
-
-            const surface =
-                String(
-                    p.Surface ||
-                    ""
-                )
-                    .toLowerCase();
-
-
-            if (
-                surface.includes(
-                    "synthetic"
-                )
-            ) {
-
-                synthetic++;
-
-            }
-
-
-            const usage =
-                String(
-                    p.Multi_Use ||
-                    ""
-                )
-                    .toLowerCase();
-
-
-            if (
-                usage.includes(
-                    "multi"
-                )
-            ) {
-
-                multiUse++;
-
-            }
-
-        }
-    );
-
-
-    const floodlitPercent =
-        Math.round(
-            floodlit /
-            count *
-            100
-        );
-
-
-    const syntheticPercent =
-        Math.round(
-            synthetic /
-            count *
-            100
-        );
-
-
-    const multiUsePercent =
-        Math.round(
-            multiUse /
-            count *
-            100
-        );
-
-
-    const sortedSports =
-        Object.entries(
-            sportCounts
+      return (
+        (
+          area /
+          10000
+        ).toLocaleString(
+          "en-IE",
+          {
+            maximumFractionDigits: 2
+          }
         )
-            .sort(
-                (a, b) =>
-                    b[1] -
-                    a[1]
-            )
-            .slice(
-                0,
-                6
-            );
-
-
-    const largestSportCount =
-        sortedSports[0]?.[1] ||
-        1;
-
-
-    let sportRows = "";
-
-
-    if (
-        !sportSelect.value &&
-        sortedSports.length > 1
-    ) {
-
-        sportRows = `
-
-            <div class="summary-sports">
-
-                <div class="summary-sports-title">
-                    Most common sports
-                </div>
-
-                ${
-                    sortedSports
-                        .map(
-                            ([
-                                sport,
-                                sportCount
-                            ]) => {
-
-                                const width =
-                                    Math.round(
-
-                                        sportCount /
-                                        largestSportCount *
-                                        100
-
-                                    );
-
-
-                                return `
-
-                                    <div class="summary-sport-row">
-
-                                        <div class="summary-sport-name">
-                                            ${escapeHtml(sport)}
-                                        </div>
-
-                                        <div class="summary-sport-bar-container">
-
-                                            <div
-                                                class="summary-sport-bar"
-                                                style="width:${width}%"
-                                            ></div>
-
-                                        </div>
-
-                                        <div class="summary-sport-count">
-                                            ${sportCount}
-                                        </div>
-
-                                    </div>
-
-                                `;
-
-                            }
-                        )
-                        .join("")
-                }
-
-            </div>
-
-        `;
-
-    }
-
-
-    const selectedSport =
-        sportSelect.value
-            ? `${sportSelect.value} • `
-            : "";
-
-
-    const averageArea =
-        count > 0 &&
-        totalArea > 0
-            ? Math.round(
-                totalArea /
-                count
-            )
-            : null;
-
-
-    areaSummary.innerHTML = `
-
-        <div class="summary-header">
-
-            <strong>
-                ${escapeHtml(selectedSport)}Current View
-            </strong>
-
-            <div class="summary-subtitle">
-                Facilities intersecting the visible map area using the current filters.
-            </div>
-
-        </div>
-
-
-        <div class="summary-grid">
-
-            ${summaryStat(
-                count.toLocaleString(),
-                "Facilities"
-            )}
-
-            ${summaryStat(
-                formatArea(totalArea),
-                "Mapped area"
-            )}
-
-            ${summaryStat(
-                `${floodlitPercent}%`,
-                "Floodlit"
-            )}
-
-            ${summaryStat(
-                `${syntheticPercent}%`,
-                "Synthetic"
-            )}
-
-            ${summaryStat(
-                `${multiUsePercent}%`,
-                "Multi-use"
-            )}
-
-            ${summaryStat(
-                averageArea
-                    ? `${averageArea.toLocaleString()} m²`
-                    : "—",
-                "Average size"
-            )}
-
-        </div>
-
-
-        ${sportRows}
-
-    `;
-
-
-    areaSummary
-        .classList
-        .remove(
-            "hidden"
-        );
-
-}
-
-
-function summaryStat(
-    value,
-    label
-) {
-
-    return `
-
-        <div class="summary-stat">
-
-            <div class="summary-stat-value">
-                ${escapeHtml(value)}
-            </div>
-
-            <div class="summary-stat-label">
-                ${escapeHtml(label)}
-            </div>
-
-        </div>
-
-    `;
-
-}
-
-
-function formatArea(
-    squareMetres
-) {
-
-    if (
-        !squareMetres ||
-        squareMetres <= 0
-    ) {
-
-        return "—";
-
-    }
-
-
-    if (
-        squareMetres >=
-        1000000
-    ) {
-
-        return (
-            squareMetres /
-            1000000
-        ).toFixed(1) +
-        " km²";
+        +
+        " ha"
+      );
 
     }
 
 
     return (
-        Math.round(
-            squareMetres
-        ).toLocaleString() +
-        " m²"
+      area.toLocaleString(
+        "en-IE",
+        {
+          maximumFractionDigits: 0
+        }
+      )
+      +
+      " m²"
     );
 
-}
+  }
 
-
-// ==========================================================
-// QUALITY
-// ==========================================================
-
-function qualityLabel(
-    quality
-) {
-
-    const value =
-        Number(quality);
-
-
-    if (value === 1) {
-        return "Poor";
-    }
-
-
-    if (value === 2) {
-        return "Good / Satisfactory";
-    }
-
-
-    if (value === 3) {
-        return "Excellent";
-    }
-
-
-    return "Not recorded";
-
-}
-
-
-// ==========================================================
-// HTML SAFETY
-// ==========================================================
-
-function escapeHtml(value) {
-
-    return String(
-        value ?? ""
-    )
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
-
-}
+});
