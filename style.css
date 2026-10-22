@@ -1,871 +1,861 @@
 /* =========================================================
-   BASE
-========================================================= */
+   GENERAL
+   ========================================================= */
 
 * {
     box-sizing: border-box;
 }
 
+
 html,
 body {
     width: 100%;
     height: 100%;
+
     margin: 0;
     padding: 0;
 
     font-family:
+        Corbel,
         Arial,
-        Helvetica,
         sans-serif;
 
-    overflow: hidden;
-}
+    color: #17211d;
 
-body {
-    background: #eeeeee;
-}
-
-
-/* =========================================================
-   MAP
-========================================================= */
-
-#map {
-    position: absolute;
-
-    top: 0;
-    left: 0;
-
-    width: 100%;
-    height: 100%;
+    background: #eef2f0;
 }
 
 
-/* =========================================================
-   TITLE
-========================================================= */
-
-.title-panel {
-    position: absolute;
-
-    top: 18px;
-    left: 18px;
-
-    z-index: 10;
-
-    background:
-        rgba(255, 255, 255, 0.94);
-
-    backdrop-filter: blur(8px);
-
-    padding: 11px 15px;
-
-    border-radius: 9px;
-
-    box-shadow:
-        0 3px 15px rgba(0, 0, 0, 0.16);
-}
-
-.title-main {
-    font-size: 16px;
-    font-weight: 700;
-}
-
-.title-sub {
-    font-size: 11px;
-
-    color: #777;
-
-    margin-top: 2px;
+button,
+input,
+select {
+    font-family: inherit;
 }
 
 
-/* =========================================================
-   CONTROL PANEL
-========================================================= */
-
-.control-panel {
-    position: absolute;
-
-    top: 92px;
-    left: 18px;
-
-    z-index: 10;
-
-    width: 285px;
-
-    max-height:
-        calc(100vh - 115px);
-
-    overflow-y: auto;
-
-    background:
-        rgba(255, 255, 255, 0.95);
-
-    backdrop-filter: blur(8px);
-
-    border-radius: 11px;
-
-    padding: 15px;
-
-    box-shadow:
-        0 4px 20px rgba(0, 0, 0, 0.18);
-}
-
-
-/* =========================================================
-   LABELS
-========================================================= */
-
-.section-label,
-.analysis-title {
-    font-size: 10px;
-
-    font-weight: 700;
-
-    text-transform: uppercase;
-
-    letter-spacing: 0.09em;
-
-    color: #777;
-
-    margin-bottom: 7px;
-}
-
-
-/* =========================================================
-   MODE SWITCH
-========================================================= */
-
-.mode-switch {
-    display: grid;
-
-    grid-template-columns:
-        1fr 1fr;
-
-    gap: 5px;
-
-    margin-bottom: 8px;
-}
-
-.mode-button {
-    border: 1px solid #d3d3d3;
-
-    background: #f5f5f5;
-
-    border-radius: 7px;
-
-    padding: 8px 5px;
-
-    cursor: pointer;
-
-    font-size: 11px;
-
-    font-weight: 600;
-}
-
-.mode-button:hover {
-    background: #ebebeb;
-}
-
-.mode-button.active {
-    background: #222;
-
-    color: white;
-
-    border-color: #222;
-}
-
-.mode-description {
-    font-size: 10px;
-
-    line-height: 1.4;
-
-    color: #777;
-
-    margin-bottom: 12px;
-}
-
-
-/* =========================================================
-   CONTROLS
-========================================================= */
-
-.control-group {
-    margin-bottom: 9px;
-}
-
-.control-group label {
-    display: block;
-
-    font-size: 10px;
-
-    font-weight: 600;
-
-    margin-bottom: 4px;
-
-    color: #555;
-}
-
-.control-group select {
-    width: 100%;
-
-    border: 1px solid #d2d2d2;
-
-    background: white;
-
-    border-radius: 6px;
-
-    padding: 7px 8px;
-
-    font-size: 11px;
-}
-
-
-/* =========================================================
-   ADVANCED FILTERS
-========================================================= */
-
-.advanced-filters {
-    margin-top: 7px;
-
-    margin-bottom: 10px;
-}
-
-.advanced-filters summary {
-    cursor: pointer;
-
-    font-size: 10px;
-
-    font-weight: 700;
-
-    color: #555;
-
-    margin-bottom: 9px;
-}
-
-.filter-grid {
-    display: grid;
-
-    grid-template-columns:
-        1fr 1fr;
-
-    gap: 3px 8px;
-}
-
-
-/* =========================================================
-   STATUS
-========================================================= */
-
-.status {
-    font-size: 10px;
-
-    line-height: 1.4;
-
-    color: #666;
-
-    background: #f4f4f4;
-
-    padding: 7px 8px;
-
-    border-radius: 6px;
-
-    margin: 8px 0;
-}
-
-
-/* =========================================================
-   CLEAR BUTTON
-========================================================= */
-
-.clear-button {
-    width: 100%;
-
-    border: 1px solid #d3d3d3;
-
-    background: white;
-
-    border-radius: 6px;
-
-    padding: 7px;
-
-    cursor: pointer;
-
-    font-size: 10px;
-
-    font-weight: 600;
-}
-
-.clear-button:hover {
-    background: #f3f3f3;
-}
-
-
-/* =========================================================
-   RESULTS
-========================================================= */
-
-.results {
-    margin-top: 12px;
-}
-
-.result-item {
-    padding: 8px 4px;
-
-    border-bottom:
-        1px solid #e6e6e6;
-
+button {
     cursor: pointer;
 }
 
-.result-item:last-child {
-    border-bottom: 0;
-}
-
-.result-item:hover {
-    background: #f5f5f5;
-}
-
-.result-header {
-    display: flex;
-
-    align-items: center;
-
-    gap: 7px;
-}
-
-.result-number {
-    width: 21px;
-    height: 21px;
-
-    flex-shrink: 0;
-
-    border-radius: 50%;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    background: #222;
-
-    color: white;
-
-    font-size: 10px;
-
-    font-weight: 700;
-}
-
-.result-title {
-    font-size: 11px;
-
-    font-weight: 700;
-
-    line-height: 1.25;
-}
-
-.result-distance {
-    font-size: 10px;
-
-    font-weight: 700;
-
-    margin-top: 4px;
-}
-
-.result-details {
-    margin-left: 28px;
-
-    margin-top: 3px;
-
-    color: #777;
-
-    font-size: 9px;
-
-    line-height: 1.4;
-}
-
-
-/* =========================================================
-   FACILITY COUNTER
-========================================================= */
-
-.facility-counter {
-    position: absolute;
-
-    bottom: 22px;
-    right: 12px;
-
-    z-index: 10;
-
-    background:
-        rgba(255, 255, 255, 0.92);
-
-    padding: 6px 9px;
-
-    border-radius: 6px;
-
-    box-shadow:
-        0 2px 10px rgba(0, 0, 0, 0.13);
-
-    font-size: 10px;
-
-    color: #555;
-}
-
-
-/* =========================================================
-   SPIDER MODE BADGE
-========================================================= */
-
-.spider-badge {
-    position: absolute;
-
-    top: 18px;
-    left: 50%;
-
-    transform:
-        translateX(-50%);
-
-    z-index: 12;
-
-    background:
-        rgba(25, 25, 25, 0.91);
-
-    color: white;
-
-    border-radius: 20px;
-
-    padding: 7px 13px;
-
-    font-size: 10px;
-
-    font-weight: 700;
-
-    letter-spacing: 0.03em;
-
-    pointer-events: none;
-}
-
-
-/* =========================================================
-   SPIDER TARGET
-========================================================= */
-
-.spider-target {
-    position: absolute;
-
-    top: 50%;
-    left: 50%;
-
-    width: 32px;
-    height: 32px;
-
-    transform:
-        translate(-50%, -50%);
-
-    z-index: 9;
-
-    pointer-events: none;
-}
-
-.target-ring {
-    position: absolute;
-
-    width: 28px;
-    height: 28px;
-
-    left: 2px;
-    top: 2px;
-
-    border:
-        2px solid rgba(20, 20, 20, 0.8);
-
-    border-radius: 50%;
-}
-
-.target-dot {
-    position: absolute;
-
-    width: 6px;
-    height: 6px;
-
-    left: 13px;
-    top: 13px;
-
-    border-radius: 50%;
-
-    background: #111;
-}
-
-
-/* =========================================================
-   ANALYSIS
-========================================================= */
-
-.analysis-divider {
-    height: 1px;
-
-    background:
-        rgba(0, 0, 0, 0.12);
-
-    margin:
-        14px 0 12px 0;
-}
-
-.analysis-buttons {
-    display: flex;
-
-    gap: 8px;
-}
-
-.analysis-buttons button {
-    width: 100%;
-
-    border: 0;
-
-    border-radius: 7px;
-
-    padding: 9px 10px;
-
-    cursor: pointer;
-
-    font-weight: 600;
-
-    font-size: 10px;
-}
-
-.analysis-buttons button:hover {
-    background: #dddddd;
-}
-
-.analysis-buttons button:disabled {
-    opacity: 0.6;
-
-    cursor: default;
-}
-
-.area-summary {
-    margin-top: 12px;
-
-    border-top:
-        1px solid rgba(0, 0, 0, 0.1);
-
-    padding-top: 12px;
-}
-
-.summary-header {
-    margin-bottom: 10px;
-}
-
-.summary-header strong {
-    display: block;
-
-    font-size: 14px;
-}
-
-.summary-subtitle {
-    font-size: 9px;
-
-    color: #777;
-
-    margin-top: 3px;
-
-    line-height: 1.4;
-}
-
-.summary-grid {
-    display: grid;
-
-    grid-template-columns:
-        1fr 1fr;
-
-    gap: 6px;
-}
-
-.summary-stat {
-    background: #f5f5f5;
-
-    border-radius: 7px;
-
-    padding: 8px;
-}
-
-.summary-stat-value {
-    font-size: 16px;
-
-    font-weight: 700;
-}
-
-.summary-stat-label {
-    font-size: 9px;
-
-    color: #666;
-
-    margin-top: 2px;
-}
-
-.summary-sports {
-    margin-top: 12px;
-}
-
-.summary-sports-title {
-    font-size: 10px;
-
-    font-weight: 700;
-
-    margin-bottom: 7px;
-}
-
-.summary-sport-row {
-    display: flex;
-
-    align-items: center;
-
-    gap: 6px;
-
-    font-size: 9px;
-
-    margin: 5px 0;
-}
-
-.summary-sport-name {
-    width: 75px;
-
-    overflow: hidden;
-
-    text-overflow: ellipsis;
-
-    white-space: nowrap;
-}
-
-.summary-sport-bar-container {
-    flex: 1;
-
-    height: 5px;
-
-    background: #e4e4e4;
-
-    border-radius: 4px;
-
-    overflow: hidden;
-}
-
-.summary-sport-bar {
-    height: 100%;
-
-    background: #333;
-}
-
-.summary-sport-count {
-    width: 27px;
-
-    text-align: right;
-
-    font-weight: 600;
-}
-
-
-/* =========================================================
-   FACILITY INFORMATION CARD
-========================================================= */
-
-.facility-card {
-    position: absolute;
-
-    right: 18px;
-    top: 70px;
-
-    width: 300px;
-
-    max-height:
-        calc(100vh - 110px);
-
-    overflow-y: auto;
-
-    background:
-        rgba(255, 255, 255, 0.96);
-
-    backdrop-filter: blur(8px);
-
-    border-radius: 12px;
-
-    padding: 18px;
-
-    box-shadow:
-        0 5px 25px rgba(0, 0, 0, 0.22);
-
-    z-index: 20;
-}
-
-.facility-card-close {
-    position: absolute;
-
-    top: 8px;
-    right: 10px;
-
-    border: 0;
-
-    background: transparent;
-
-    font-size: 22px;
-
-    cursor: pointer;
-
-    color: #777;
-}
-
-.facility-card-heading {
-    text-transform: uppercase;
-
-    font-size: 9px;
-
-    font-weight: 700;
-
-    letter-spacing: 0.1em;
-
-    color: #888;
-
-    margin-bottom: 5px;
-}
-
-.facility-name {
-    font-size: 19px;
-
-    font-weight: 700;
-
-    line-height: 1.2;
-
-    margin-bottom: 4px;
-}
-
-.facility-sport {
-    font-size: 12px;
-
-    font-weight: 600;
-
-    margin-bottom: 15px;
-}
-
-.facility-info-grid {
-    display: grid;
-
-    grid-template-columns:
-        1fr 1fr;
-
-    gap: 7px;
-}
-
-.facility-info-item {
-    padding: 8px;
-
-    background: #f5f5f5;
-
-    border-radius: 7px;
-}
-
-.facility-info-label {
-    display: block;
-
-    font-size: 8px;
-
-    text-transform: uppercase;
-
-    color: #888;
-
-    margin-bottom: 2px;
-}
-
-.facility-info-value {
-    font-size: 11px;
-
-    font-weight: 600;
-}
-
-.facility-location {
-    margin-top: 12px;
-
-    padding-top: 10px;
-
-    border-top:
-        1px solid #ddd;
-
-    font-size: 10px;
-
-    line-height: 1.6;
-}
-
-.facility-id {
-    margin-top: 10px;
-
-    font-size: 8px;
-
-    color: #aaa;
-
-    word-break: break-all;
-}
-
-
-/* =========================================================
-   POINT SEARCH MARKER
-========================================================= */
-
-.search-marker {
-    width: 14px;
-    height: 14px;
-
-    border-radius: 50%;
-
-    background: #111;
-
-    border: 3px solid white;
-
-    box-shadow:
-        0 1px 6px rgba(0, 0, 0, 0.4);
-}
-
-
-/* =========================================================
-   MAPLIBRE
-========================================================= */
-
-.maplibregl-ctrl-top-right {
-    top: 10px;
-    right: 10px;
-}
-
-
-/* =========================================================
-   HIDDEN
-========================================================= */
 
 .hidden {
     display: none !important;
 }
 
 
+
 /* =========================================================
-   SMALL SCREENS
-========================================================= */
+   APP
+   ========================================================= */
 
-@media (max-width: 700px) {
+.app {
+    display: grid;
 
-    .control-panel {
-        width: 260px;
+    grid-template-columns:
+        340px
+        1fr;
+
+    grid-template-rows:
+        76px
+        1fr;
+
+    width: 100vw;
+    height: 100vh;
+}
+
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.header {
+    grid-column: 1 / 3;
+
+    display: flex;
+    align-items: center;
+
+    background:
+        linear-gradient(
+            90deg,
+            #008565,
+            #006b4f
+        );
+
+    color: white;
+}
+
+
+.brand {
+    width: 340px;
+    height: 100%;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    padding-left: 22px;
+
+    border-right:
+        1px solid
+        rgba(255, 255, 255, 0.28);
+}
+
+
+.brand-main {
+    font-size: 21px;
+    font-weight: 700;
+
+    letter-spacing: 0.4px;
+}
+
+
+.brand-sub {
+    margin-top: 3px;
+
+    font-size: 14px;
+
+    letter-spacing: 0.7px;
+
+    opacity: 0.92;
+}
+
+
+.header-copy {
+    padding-left: 25px;
+
+    font-size: 18px;
+}
+
+
+
+/* =========================================================
+   CONTROL PANEL
+   ========================================================= */
+
+.control-panel {
+    overflow-y: auto;
+
+    margin:
+        8px
+        4px
+        8px
+        8px;
+
+    background: white;
+
+    border:
+        1px solid
+        #00a878;
+
+    border-radius: 12px;
+}
+
+
+.panel-title {
+    padding:
+        17px
+        18px;
+
+    border-bottom:
+        1px solid
+        #dde4e1;
+
+    font-size: 20px;
+
+    font-weight: 700;
+}
+
+
+
+/* =========================================================
+   MODE SWITCH
+   ========================================================= */
+
+.mode-switch {
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        1fr;
+
+    gap: 6px;
+
+    padding:
+        14px
+        16px;
+
+    border-bottom:
+        1px solid
+        #e3e8e6;
+}
+
+
+.mode-button {
+    padding:
+        10px
+        8px;
+
+    border:
+        1px solid
+        #b8d7cc;
+
+    border-radius: 8px;
+
+    background: #f4faf7;
+
+    color: #006b4f;
+
+    font-size: 14px;
+
+    font-weight: 700;
+}
+
+
+.mode-button.active {
+    border-color: #008565;
+
+    background: #008565;
+
+    color: white;
+}
+
+
+
+/* =========================================================
+   CONTROLS
+   ========================================================= */
+
+.control-section {
+    padding:
+        15px
+        16px;
+
+    border-bottom:
+        1px solid
+        #e3e8e6;
+}
+
+
+.control-label {
+    display: block;
+
+    margin-bottom: 7px;
+
+    font-size: 14px;
+
+    font-weight: 700;
+}
+
+
+.control-select,
+.search-input {
+    width: 100%;
+
+    min-height: 40px;
+
+    padding:
+        8px
+        10px;
+
+    border:
+        1px solid
+        #bac8c2;
+
+    border-radius: 7px;
+
+    background: white;
+
+    color: #17211d;
+
+    font-size: 14px;
+}
+
+
+.control-select:focus,
+.search-input:focus {
+    outline:
+        2px solid
+        rgba(0, 168, 120, 0.18);
+
+    border-color: #00a878;
+}
+
+
+.search-row {
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        auto;
+
+    gap: 7px;
+}
+
+
+.primary-button {
+    border: none;
+
+    border-radius: 7px;
+
+    background: #008565;
+
+    color: white;
+
+    font-size: 14px;
+
+    font-weight: 700;
+}
+
+
+.primary-button:hover {
+    background: #006b4f;
+}
+
+
+.search-button {
+    padding:
+        0
+        14px;
+}
+
+
+.secondary-button {
+    width: 100%;
+
+    margin-top: 8px;
+
+    padding:
+        9px
+        10px;
+
+    border:
+        1px solid
+        #9ccbbd;
+
+    border-radius: 7px;
+
+    background: #f0f8f5;
+
+    color: #006b4f;
+
+    font-size: 13px;
+
+    font-weight: 700;
+}
+
+
+.secondary-button:hover {
+    background: #e2f2ec;
+}
+
+
+.search-message {
+    margin-top: 9px;
+
+    color: #66746e;
+
+    font-size: 12px;
+
+    line-height: 1.4;
+}
+
+
+
+/* =========================================================
+   SPIDER INFO
+   ========================================================= */
+
+.spider-info {
+    padding:
+        11px
+        12px;
+
+    border:
+        1px solid
+        #b9d9cd;
+
+    border-radius: 9px;
+
+    background: #edf8f4;
+}
+
+
+.spider-info strong {
+    color: #006b4f;
+}
+
+
+.spider-info p {
+    margin:
+        5px
+        0
+        0
+        0;
+
+    color: #50615a;
+
+    font-size: 13px;
+
+    line-height: 1.4;
+}
+
+
+
+/* =========================================================
+   METRICS
+   ========================================================= */
+
+.metrics-section {
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        1fr;
+
+    gap: 8px;
+
+    padding:
+        14px
+        16px;
+
+    border-bottom:
+        1px solid
+        #e3e8e6;
+}
+
+
+.metric-card {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+
+    padding:
+        11px
+        12px;
+
+    border-radius: 9px;
+
+    background: #eef7f3;
+}
+
+
+.metric-label {
+    color: #65736d;
+
+    font-size: 11px;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.4px;
+}
+
+
+.metric-card strong {
+    color: #006b4f;
+
+    font-size: 20px;
+}
+
+
+
+/* =========================================================
+   RESULTS
+   ========================================================= */
+
+.results-section {
+    padding:
+        14px
+        16px
+        18px;
+}
+
+
+.results-heading {
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    margin-bottom: 10px;
+}
+
+
+.results-heading h2 {
+    margin: 0;
+
+    font-size: 16px;
+}
+
+
+#resultsStatus {
+    color: #6b7872;
+
+    font-size: 11px;
+}
+
+
+.results-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+
+.result-card {
+    padding:
+        11px
+        12px;
+
+    border:
+        1px solid
+        #dce4e0;
+
+    border-radius: 9px;
+
+    background: #ffffff;
+
+    cursor: pointer;
+
+    transition:
+        transform 0.12s ease,
+        border-color 0.12s ease,
+        box-shadow 0.12s ease;
+}
+
+
+.result-card:hover {
+    transform:
+        translateY(-1px);
+
+    border-color: #00a878;
+
+    box-shadow:
+        0
+        3px
+        10px
+        rgba(0, 0, 0, 0.08);
+}
+
+
+.result-rank {
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    width: 24px;
+    height: 24px;
+
+    margin-right: 7px;
+
+    border-radius: 50%;
+
+    background: #008565;
+
+    color: white;
+
+    font-size: 12px;
+
+    font-weight: 700;
+}
+
+
+.result-title-row {
+    display: flex;
+
+    align-items: center;
+
+    margin-bottom: 7px;
+}
+
+
+.result-title {
+    min-width: 0;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-size: 14px;
+
+    font-weight: 700;
+}
+
+
+.result-meta {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap:
+        5px
+        12px;
+
+    color: #66736e;
+
+    font-size: 12px;
+}
+
+
+.result-distance {
+    color: #006b4f;
+
+    font-weight: 700;
+}
+
+
+
+/* =========================================================
+   MAP
+   ========================================================= */
+
+.map-panel {
+    position: relative;
+
+    overflow: hidden;
+
+    margin:
+        8px
+        8px
+        8px
+        4px;
+
+    border:
+        1px solid
+        #00a878;
+
+    border-radius: 12px;
+
+    background: #e8efec;
+}
+
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+
+
+/* =========================================================
+   CENTRE TARGET
+   ========================================================= */
+
+.centre-target {
+    position: absolute;
+
+    z-index: 20;
+
+    top: 50%;
+    left: 50%;
+
+    width: 28px;
+    height: 28px;
+
+    transform:
+        translate(
+            -50%,
+            -50%
+        );
+
+    pointer-events: none;
+}
+
+
+.target-horizontal,
+.target-vertical {
+    position: absolute;
+
+    background: #006b4f;
+}
+
+
+.target-horizontal {
+    top: 13px;
+    left: 0;
+
+    width: 28px;
+    height: 2px;
+}
+
+
+.target-vertical {
+    top: 0;
+    left: 13px;
+
+    width: 2px;
+    height: 28px;
+}
+
+
+.target-dot {
+    position: absolute;
+
+    top: 10px;
+    left: 10px;
+
+    width: 8px;
+    height: 8px;
+
+    border:
+        2px solid
+        white;
+
+    border-radius: 50%;
+
+    background: #00a878;
+
+    box-shadow:
+        0
+        1px
+        4px
+        rgba(0, 0, 0, 0.35);
+}
+
+
+
+/* =========================================================
+   MAP STATUS
+   ========================================================= */
+
+.map-status {
+    position: absolute;
+
+    z-index: 12;
+
+    right: 12px;
+    bottom: 12px;
+
+    max-width: 300px;
+
+    padding:
+        8px
+        11px;
+
+    border-radius: 7px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.94
+        );
+
+    color: #47544e;
+
+    font-size: 12px;
+
+    box-shadow:
+        0
+        2px
+        8px
+        rgba(0, 0, 0, 0.14);
+}
+
+
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+.map-reset-button {
+    position: absolute;
+
+    z-index: 12;
+
+    top: 78px;
+    left: 10px;
+
+    padding:
+        9px
+        11px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.96
+        );
+
+    color: #006b4f;
+
+    font-size: 13px;
+
+    font-weight: 700;
+
+    box-shadow:
+        0
+        2px
+        8px
+        rgba(0, 0, 0, 0.18);
+}
+
+
+
+/* =========================================================
+   MAPLIBRE POPUP
+   ========================================================= */
+
+.maplibregl-popup-content {
+    min-width: 220px;
+
+    padding:
+        13px
+        14px;
+
+    border-radius: 9px;
+}
+
+
+.popup-title {
+    margin-bottom: 7px;
+
+    font-size: 15px;
+
+    font-weight: 700;
+}
+
+
+.popup-row {
+    margin-top: 4px;
+
+    color: #50605a;
+
+    font-size: 12px;
+}
+
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1050px) {
+
+    .app {
+        grid-template-columns:
+            290px
+            1fr;
     }
 
-    .facility-card {
-        width: 270px;
 
-        right: 10px;
+    .brand {
+        width: 290px;
     }
 
-    .spider-badge {
-        top: auto;
-
-        bottom: 20px;
-
-        white-space: nowrap;
-    }
 }
