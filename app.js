@@ -1,2128 +1,2586 @@
-require([
-  "esri/Map",
-  "esri/Basemap",
-  "esri/views/MapView",
-  "esri/layers/FeatureLayer",
-  "esri/layers/OpenStreetMapLayer",
-  "esri/widgets/Search",
-  "esri/geometry/Extent",
-  "esri/geometry/geometryEngine"
-], function (
-  Map,
-  Basemap,
-  MapView,
-  FeatureLayer,
-  OpenStreetMapLayer,
-  Search,
-  Extent,
-  geometryEngine
-) {
-
-  // =========================================================
-  // SETTINGS
-  // =========================================================
-
-  const FACILITIES_URL =
-    "https://services-eu1.arcgis.com/z1y55jruXrgzzpdi/arcgis/rest/services/Sport_Ireland_Facilities_Mapping/FeatureServer/0";
-
-  const CLICK_TOLERANCE_PIXELS = 14;
-  const OSM_OPACITY = 0.45;
-
-  const IRELAND_CENTER = [-8, 53.4];
-  const IRELAND_ZOOM = 7;
+const FACILITIES_URL =
+    "https://services-eu1.arcgis.com/z1y55jruXrgzzpdi/arcgis/rest/services/Sport_Ireland_Facilities_Mapping/FeatureServer/0/query";
 
 
-  // =========================================================
-  // MAIN SPORTS
-  // =========================================================
-
-  const mainSports = [
-    { value: "Gaelic Games", label: "Gaelic Games" },
-    { value: "Soccer", label: "Soccer" },
-    { value: "Golf", label: "Golf" },
-    { value: "Tennis", label: "Tennis" },
-    { value: "Basketball", label: "Basketball" },
-    { value: "Athletics", label: "Athletics" },
-    { value: "Hockey", label: "Hockey" },
-    { value: "Cricket", label: "Cricket" },
-    { value: "Sports Hall", label: "Sports Halls" },
-    { value: "Swimming Indoor", label: "Swimming Indoor" }
-  ];
+const BASE_WHERE =
+    "(Validation <> 'Remove' OR Validation IS NULL)";
 
 
-  // =========================================================
-  // COLOURS
-  // =========================================================
-
-  const sportColours = {
-    "Gaelic Games": [0, 176, 80],
-    "Soccer": [25, 110, 235],
-    "Golf": [120, 145, 95],
-    "Tennis": [235, 205, 0],
-    "Basketball": [255, 145, 20],
-    "Athletics": [145, 65, 205],
-    "Hockey": [55, 65, 175],
-    "Cricket": [185, 90, 165],
-    "Sports Hall": [105, 105, 140],
-    "Swimming Indoor": [0, 185, 220],
-
-    "Rugby": [230, 65, 55],
-    "Swimming Outdoor": [70, 165, 195],
-    "Equestrian": [145, 125, 105],
-    "Badminton": [220, 95, 155],
-    "Boxing": [185, 75, 55],
-    "Cycling": [55, 155, 125],
-    "Gym": [105, 105, 105],
-    "Gymnastics": [170, 100, 195],
-    "Rowing": [55, 125, 175],
-    "Sailing": [45, 145, 185],
-    "Padel": [230, 165, 30],
-    "5-a-side": [70, 155, 230],
-    "Pitch and Putt": [130, 140, 120],
-    "Canoe/Kayak": [100, 130, 135],
-    "GAA Handball": [115, 115, 115],
-    "Multiple": [145, 95, 165],
-    "Other": [145, 145, 145]
-  };
+const NEAREST_COUNT =
+    8;
 
 
-  // =========================================================
-  // RENDERER
-  // =========================================================
+const CACHE_RADIUS_KM =
+    45;
 
-  const rendererInfos =
-    Object.entries(sportColours).map(
-      function ([sport, colour]) {
 
-        return {
-          value: sport,
+const PAGE_SIZE =
+    2000;
 
-          symbol: {
-            type: "simple-fill",
 
-            color: [
-              colour[0],
-              colour[1],
-              colour[2],
-              0.44
-            ],
+const IRELAND_CENTER = [
+    -8.0,
+    53.4
+];
 
-            outline: {
-              color: [
-                colour[0],
-                colour[1],
-                colour[2],
-                1
-              ],
 
-              width: 2
-            }
-          }
-        };
+const IRELAND_ZOOM =
+    6.3;
 
-      }
+
+
+let currentMode =
+    "point";
+
+
+let selectedSport =
+    "";
+
+
+let searchPoint =
+    null;
+
+
+let regionalFeatures =
+    [];
+
+
+let cacheCentre =
+    null;
+
+
+let cacheSport =
+    null;
+
+
+let nearestFeatures =
+    [];
+
+
+let fetchRequestId =
+    0;
+
+
+
+const pointModeButton =
+    document.getElementById(
+        "pointModeButton"
     );
 
 
-  // =========================================================
-  // FACILITY LAYER
-  // =========================================================
+const spiderModeButton =
+    document.getElementById(
+        "spiderModeButton"
+    );
 
-  const facilitiesLayer =
-    new FeatureLayer({
 
-      url: FACILITIES_URL,
+const pointSearchControls =
+    document.getElementById(
+        "pointSearchControls"
+    );
 
-      definitionExpression:
-        "Owner <> 'Private Residence' OR Owner IS NULL",
 
-      outFields: [
-        "OBJECTID",
-        "Sport",
-        "Infrastructure_Type",
-        "Surface",
-        "Floodlights",
-        "Owner",
-        "Facility_Size",
-        "Owner_Name",
-        "Quality",
-        "Local_Authority",
-        "LEA",
-        "Multi_Use",
-        "Area_msq"
-      ],
+const spiderControls =
+    document.getElementById(
+        "spiderControls"
+    );
 
-      minScale: 0,
 
-      popupEnabled: false,
+const sportSelect =
+    document.getElementById(
+        "sportSelect"
+    );
 
-      renderer: {
-        type: "unique-value",
 
-        field: "Sport",
+const placeSearch =
+    document.getElementById(
+        "placeSearch"
+    );
 
-        defaultSymbol: {
-          type: "simple-fill",
 
-          color: [
-            145,
-            145,
-            145,
-            0.27
-          ],
+const searchButton =
+    document.getElementById(
+        "searchButton"
+    );
 
-          outline: {
-            color: [
-              100,
-              100,
-              100,
-              1
-            ],
 
-            width: 1.5
-          }
+const useMapCentreButton =
+    document.getElementById(
+        "useMapCentreButton"
+    );
+
+
+const searchMessage =
+    document.getElementById(
+        "searchMessage"
+    );
+
+
+const facilityCount =
+    document.getElementById(
+        "facilityCount"
+    );
+
+
+const averageDistance =
+    document.getElementById(
+        "averageDistance"
+    );
+
+
+const resultsStatus =
+    document.getElementById(
+        "resultsStatus"
+    );
+
+
+const resultsList =
+    document.getElementById(
+        "resultsList"
+    );
+
+
+const centreTarget =
+    document.getElementById(
+        "centreTarget"
+    );
+
+
+const mapStatus =
+    document.getElementById(
+        "mapStatus"
+    );
+
+
+const fullIrelandButton =
+    document.getElementById(
+        "fullIrelandButton"
+    );
+
+
+
+const map =
+    new maplibregl.Map({
+
+        container:
+            "map",
+
+        style: {
+            version: 8,
+
+            sources: {
+
+                osm: {
+                    type:
+                        "raster",
+
+                    tiles: [
+                        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    ],
+
+                    tileSize:
+                        256,
+
+                    attribution:
+                        "© OpenStreetMap contributors"
+                }
+
+            },
+
+            layers: [
+
+                {
+                    id:
+                        "osm",
+
+                    type:
+                        "raster",
+
+                    source:
+                        "osm",
+
+                    paint: {
+                        "raster-opacity":
+                            0.58,
+
+                        "raster-saturation":
+                            -0.45
+                    }
+                }
+
+            ]
         },
 
-        uniqueValueInfos: rendererInfos
-      }
+        center:
+            IRELAND_CENTER,
+
+        zoom:
+            IRELAND_ZOOM
 
     });
 
 
-  // =========================================================
-  // BASEMAP
-  // =========================================================
 
-  const osmLayer =
-    new OpenStreetMapLayer({
-      opacity: OSM_OPACITY
-    });
-
-  const customBasemap =
-    new Basemap({
-      baseLayers: [osmLayer],
-      title: "Muted OpenStreetMap"
-    });
+map.addControl(
+    new maplibregl.NavigationControl(),
+    "top-left"
+);
 
 
-  // =========================================================
-  // MAP / VIEW
-  // =========================================================
 
-  const map =
-    new Map({
-      basemap: customBasemap,
-      layers: [facilitiesLayer]
-    });
-
-
-  const view =
-    new MapView({
-
-      container: "viewDiv",
-
-      map: map,
-
-      center: IRELAND_CENTER,
-
-      zoom: IRELAND_ZOOM,
-
-      background: {
-        color: [245, 246, 245, 1]
-      },
-
-      constraints: {
-        minZoom: 6
-      },
-
-      highlightOptions: {
-        color: [0, 190, 175, 1],
-        haloOpacity: 0.9,
-        fillOpacity: 0.10
-      }
-
-    });
-
-
-  // =========================================================
-  // SEARCH
-  // =========================================================
-
-  const search =
-    new Search({
-      view: view,
-      includeDefaultSources: true,
-      locationEnabled: false
-    });
-
-  view.ui.add(
-    search,
-    "top-right"
-  );
-
-
-  // =========================================================
-  // STATE
-  // =========================================================
-
-  let facilitiesLayerView = null;
-
-  let highlightHandle = null;
-  let currentOverlayGraphic = null;
-
-  let selectedGraphics = [];
-  let selectedIndex = 0;
-  let selectedGraphic = null;
-
-
-  // =========================================================
-  // HTML
-  // =========================================================
-
-  const resultCount =
-    document.getElementById("resultCount");
-
-  const emptyState =
-    document.getElementById("emptyState");
-
-  const facilityDetails =
-    document.getElementById("facilityDetails");
-
-  const closeDetails =
-    document.getElementById("closeDetails");
-
-  const zoomToFacility =
-    document.getElementById("zoomToFacility");
-
-  const homeButton =
-    document.getElementById("homeButton");
-
-  const selectAllFilters =
-    document.getElementById("selectAllFilters");
-
-  const deselectAllFilters =
-    document.getElementById("deselectAllFilters");
-
-  const mainSportFilters =
-    document.getElementById("mainSportFilters");
-
-  const moreSportFilters =
-    document.getElementById("moreSportFilters");
-
-  const ownerFilters =
-    document.getElementById("ownerFilters");
-
-  const surfaceFilters =
-    document.getElementById("surfaceFilters");
-
-  const floodlightFilters =
-    document.getElementById("floodlightFilters");
-
-  const legendItems =
-    document.getElementById("legendItems");
-
-  const selectionNavigator =
-    document.getElementById("selectionNavigator");
-
-  const selectionPosition =
-    document.getElementById("selectionPosition");
-
-  const previousFacility =
-    document.getElementById("previousFacility");
-
-  const nextFacility =
-    document.getElementById("nextFacility");
-
-
-  // =========================================================
-  // LOAD
-  // =========================================================
-
-  view.when(
+map.on(
+    "load",
     async function () {
 
-      await facilitiesLayer.load();
+        addMapSourcesAndLayers();
 
-      facilitiesLayerView =
-        await view.whenLayerView(
-          facilitiesLayer
-        );
+        await loadSportValues();
 
-      buildFilters();
-      buildLegend();
-      setupDropdowns();
-
-      await updateResultCount();
+        mapStatus.textContent =
+            "Ready";
 
     }
-  )
-  .catch(
-    function (error) {
-
-      console.error(
-        "LOAD ERROR:",
-        error
-      );
-
-      if (resultCount) {
-        resultCount.textContent =
-          "Unable to load facilities";
-      }
-
-    }
-  );
+);
 
 
-  // =========================================================
-  // BUILD FILTERS
-  // =========================================================
 
-  function buildFilters() {
+function addMapSourcesAndLayers() {
 
-    buildSportFilters();
+    map.addSource(
+        "nearest-facilities",
+        {
+            type:
+                "geojson",
 
-    buildDomainFilter(
-      "Owner",
-      ownerFilters,
-      "owner-filter"
-    );
-
-    buildDomainFilter(
-      "Surface",
-      surfaceFilters,
-      "surface-filter"
-    );
-
-    buildDomainFilter(
-      "Floodlights",
-      floodlightFilters,
-      "floodlight-filter"
-    );
-
-  }
-
-
-  // =========================================================
-  // SPORT FILTERS
-  // =========================================================
-
-  function buildSportFilters() {
-
-    const sportField =
-      facilitiesLayer.fields.find(
-        function (field) {
-          return field.name === "Sport";
+            data:
+                emptyFeatureCollection()
         }
-      );
+    );
 
 
-    if (
-      !sportField ||
-      !sportField.domain ||
-      !sportField.domain.codedValues
-    ) {
-      return;
-    }
+    map.addLayer(
+        {
+            id:
+                "nearest-facilities-fill",
 
+            type:
+                "fill",
 
-    mainSportFilters.innerHTML = "";
-    moreSportFilters.innerHTML = "";
+            source:
+                "nearest-facilities",
 
+            paint: {
 
-    const domainValues =
-      sportField.domain.codedValues.slice();
+                "fill-color":
+                    [
+                        "case",
 
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Gaelic Games"
+                        ],
+                        "#00a878",
 
-    mainSports.forEach(
-      function (mainSport) {
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Soccer"
+                        ],
+                        "#247be0",
 
-        const match =
-          domainValues.find(
-            function (codedValue) {
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Rugby"
+                        ],
+                        "#df4b42",
 
-              return (
-                codedValue.code === mainSport.value ||
-                codedValue.name === mainSport.value
-              );
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Basketball"
+                        ],
+                        "#f68b1f",
 
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Tennis"
+                        ],
+                        "#d9c500",
+
+                        "#787f7c"
+                    ],
+
+                "fill-opacity":
+                    0.42
             }
-          );
-
-
-        if (match) {
-
-          addSportCheckbox(
-            match,
-            mainSportFilters,
-            mainSport.label
-          );
-
         }
-
-      }
     );
 
 
-    const mainValues =
-      mainSports.map(
-        function (sport) {
-          return sport.value;
+    map.addLayer(
+        {
+            id:
+                "nearest-facilities-outline",
+
+            type:
+                "line",
+
+            source:
+                "nearest-facilities",
+
+            paint: {
+
+                "line-color":
+                    [
+                        "case",
+
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Gaelic Games"
+                        ],
+                        "#007f59",
+
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Soccer"
+                        ],
+                        "#125cba",
+
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Rugby"
+                        ],
+                        "#b52f29",
+
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Basketball"
+                        ],
+                        "#c86a00",
+
+                        [
+                            "==",
+                            ["get", "Sport"],
+                            "Tennis"
+                        ],
+                        "#a99500",
+
+                        "#555f5a"
+                    ],
+
+                "line-width":
+                    2.5
+            }
         }
-      );
+    );
 
 
-    domainValues
-      .filter(
-        function (codedValue) {
+    map.addSource(
+        "spider-lines",
+        {
+            type:
+                "geojson",
 
-          return (
-            !mainValues.includes(codedValue.code) &&
-            !mainValues.includes(codedValue.name)
-          );
-
+            data:
+                emptyFeatureCollection()
         }
-      )
-      .sort(
-        function (a, b) {
-          return a.name.localeCompare(b.name);
+    );
+
+
+    map.addLayer(
+        {
+            id:
+                "spider-lines",
+
+            type:
+                "line",
+
+            source:
+                "spider-lines",
+
+            paint: {
+                "line-color":
+                    "#006b4f",
+
+                "line-width":
+                    2,
+
+                "line-opacity":
+                    0.72,
+
+                "line-dasharray":
+                    [
+                        2,
+                        2
+                    ]
+            }
+        },
+        "nearest-facilities-fill"
+    );
+
+
+    map.addSource(
+        "origin-point",
+        {
+            type:
+                "geojson",
+
+            data:
+                emptyFeatureCollection()
         }
-      )
-      .forEach(
-        function (codedValue) {
+    );
 
-          addSportCheckbox(
-            codedValue,
-            moreSportFilters,
-            codedValue.name
-          );
 
+    map.addLayer(
+        {
+            id:
+                "origin-point",
+
+            type:
+                "circle",
+
+            source:
+                "origin-point",
+
+            paint: {
+                "circle-radius":
+                    7,
+
+                "circle-color":
+                    "#006b4f",
+
+                "circle-stroke-color":
+                    "#ffffff",
+
+                "circle-stroke-width":
+                    2
+            }
         }
-      );
-
-  }
-
-
-  function addSportCheckbox(
-    codedValue,
-    container,
-    displayLabel
-  ) {
-
-    const label =
-      document.createElement("label");
-
-    label.className =
-      "checkbox-item";
-
-
-    const checkbox =
-      document.createElement("input");
-
-    checkbox.type =
-      "checkbox";
-
-    checkbox.value =
-      codedValue.code;
-
-    checkbox.classList.add(
-      "sport-filter"
     );
 
-    checkbox.checked =
-      true;
+}
 
 
-    label.appendChild(
-      checkbox
-    );
 
-
-    const square =
-      document.createElement("span");
-
-    square.className =
-      "colour-square";
-
-
-    const colour =
-      sportColours[codedValue.code] ||
-      sportColours[codedValue.name] ||
-      [145, 145, 145];
-
-
-    square.style.backgroundColor =
-      `rgb(${colour[0]},${colour[1]},${colour[2]})`;
-
-
-    label.appendChild(
-      square
-    );
-
-
-    const text =
-      document.createElement("span");
-
-    text.textContent =
-      displayLabel;
-
-
-    label.appendChild(
-      text
-    );
-
-
-    checkbox.addEventListener(
-      "change",
-      applyFilters
-    );
-
-
-    container.appendChild(
-      label
-    );
-
-  }
-
-
-  // =========================================================
-  // DOMAIN FILTERS
-  // =========================================================
-
-  function buildDomainFilter(
-    fieldName,
-    container,
-    className
-  ) {
-
-    if (!container) {
-      return;
-    }
-
-
-    const field =
-      facilitiesLayer.fields.find(
-        function (item) {
-          return item.name === fieldName;
-        }
-      );
-
-
-    if (
-      !field ||
-      !field.domain ||
-      !field.domain.codedValues
-    ) {
-
-      container.innerHTML =
-        "<span>No values available</span>";
-
-      return;
-
-    }
-
-
-    container.innerHTML = "";
-
-
-    field.domain.codedValues.forEach(
-      function (codedValue) {
-
-        if (
-          fieldName === "Owner" &&
-          (
-            codedValue.code === "Private Residence" ||
-            codedValue.name === "Private Residence"
-          )
-        ) {
-          return;
-        }
-
-
-        const label =
-          document.createElement("label");
-
-        label.className =
-          "checkbox-item";
-
-
-        const checkbox =
-          document.createElement("input");
-
-        checkbox.type =
-          "checkbox";
-
-        checkbox.value =
-          codedValue.code;
-
-        checkbox.classList.add(
-          className
-        );
-
-        checkbox.checked =
-          true;
-
-
-        label.appendChild(
-          checkbox
-        );
-
-
-        const text =
-          document.createElement("span");
-
-        text.textContent =
-          codedValue.name;
-
-
-        label.appendChild(
-          text
-        );
-
-
-        checkbox.addEventListener(
-          "change",
-          applyFilters
-        );
-
-
-        container.appendChild(
-          label
-        );
-
-      }
-    );
-
-  }
-
-
-  // =========================================================
-  // DROPDOWNS
-  // =========================================================
-
-  function setupDropdowns() {
-
-    setupDropdown(
-      "moreSportsButton",
-      "moreSportFilters",
-      "moreSportsArrow"
-    );
-
-    setupDropdown(
-      "ownerFilterButton",
-      "ownerFilters",
-      "ownerFilterArrow"
-    );
-
-    setupDropdown(
-      "surfaceFilterButton",
-      "surfaceFilters",
-      "surfaceFilterArrow"
-    );
-
-    setupDropdown(
-      "floodlightFilterButton",
-      "floodlightFilters",
-      "floodlightFilterArrow"
-    );
-
-  }
-
-
-  function setupDropdown(
-    buttonId,
-    listId,
-    arrowId
-  ) {
-
-    const button =
-      document.getElementById(buttonId);
-
-    const list =
-      document.getElementById(listId);
-
-    const arrow =
-      document.getElementById(arrowId);
-
-
-    if (!button || !list || !arrow) {
-      return;
-    }
-
-
-    button.addEventListener(
-      "click",
-      function () {
-
-        const isHidden =
-          list.classList.contains("hidden");
-
-
-        list.classList.toggle(
-          "hidden",
-          !isHidden
-        );
-
-
-        arrow.textContent =
-          isHidden
-            ? "▴"
-            : "▾";
-
-      }
-    );
-
-  }
-
-
-  // =========================================================
-  // LEGEND
-  // =========================================================
-
-  function buildLegend() {
-
-    if (!legendItems) {
-      return;
-    }
-
-
-    legendItems.innerHTML = "";
-
-
-    mainSports.forEach(
-      function (sport) {
-
-        const row =
-          document.createElement("div");
-
-        row.className =
-          "legend-item";
-
-
-        const square =
-          document.createElement("span");
-
-        square.className =
-          "legend-colour";
-
-
-        const colour =
-          sportColours[sport.value] ||
-          [145, 145, 145];
-
-
-        square.style.backgroundColor =
-          `rgb(${colour[0]},${colour[1]},${colour[2]})`;
-
-
-        const text =
-          document.createElement("span");
-
-        text.textContent =
-          sport.label;
-
-
-        row.appendChild(square);
-        row.appendChild(text);
-
-        legendItems.appendChild(row);
-
-      }
-    );
-
-  }
-
-
-  // =========================================================
-  // FILTERS
-  // =========================================================
-
-  async function applyFilters() {
-
-    if (!facilitiesLayerView) {
-      return;
-    }
-
-
-    const selectedSports =
-      getCheckedValues(".sport-filter");
-
-    const selectedOwners =
-      getCheckedValues(".owner-filter");
-
-    const selectedSurfaces =
-      getCheckedValues(".surface-filter");
-
-    const selectedFloodlights =
-      getCheckedValues(".floodlight-filter");
-
-
-    const totalSports =
-      document.querySelectorAll(".sport-filter").length;
-
-    const totalOwners =
-      document.querySelectorAll(".owner-filter").length;
-
-    const totalSurfaces =
-      document.querySelectorAll(".surface-filter").length;
-
-    const totalFloodlights =
-      document.querySelectorAll(".floodlight-filter").length;
-
-
-    const nothingSelected =
-      selectedSports.length === 0 &&
-      selectedOwners.length === 0 &&
-      selectedSurfaces.length === 0 &&
-      selectedFloodlights.length === 0;
-
-
-    if (nothingSelected) {
-
-      facilitiesLayerView.filter = {
-        where: "1=0"
-      };
-
-      clearSelection();
-
-      await updateResultCount();
-
-      return;
-
-    }
-
-
-    const clauses = [];
-
-
-    addFilterClause(
-      clauses,
-      "Sport",
-      selectedSports,
-      totalSports
-    );
-
-    addFilterClause(
-      clauses,
-      "Owner",
-      selectedOwners,
-      totalOwners
-    );
-
-    addFilterClause(
-      clauses,
-      "Surface",
-      selectedSurfaces,
-      totalSurfaces
-    );
-
-    addFilterClause(
-      clauses,
-      "Floodlights",
-      selectedFloodlights,
-      totalFloodlights
-    );
-
-
-    facilitiesLayerView.filter = {
-      where:
-        clauses.length > 0
-          ? clauses.join(" AND ")
-          : "1=1"
-    };
-
-
-    clearSelection();
-
-    await updateResultCount();
-
-  }
-
-
-  function addFilterClause(
-    clauses,
-    field,
-    values,
-    total
-  ) {
-
-    if (
-      values.length > 0 &&
-      values.length < total
-    ) {
-
-      clauses.push(
-        buildInClause(
-          field,
-          values
-        )
-      );
-
-    }
-
-  }
-
-
-  function getCheckedValues(selector) {
-
-    return Array.from(
-      document.querySelectorAll(
-        selector + ":checked"
-      )
-    ).map(
-      function (checkbox) {
-        return checkbox.value;
-      }
-    );
-
-  }
-
-
-  function buildInClause(
-    fieldName,
-    values
-  ) {
-
-    const escapedValues =
-      values.map(
-        function (value) {
-
-          return (
-            "'" +
-            String(value).replace(/'/g, "''") +
-            "'"
-          );
-
-        }
-      );
-
-
-    return (
-      fieldName +
-      " IN (" +
-      escapedValues.join(",") +
-      ")"
-    );
-
-  }
-
-
-  function getCurrentWhereClause() {
-
-    if (
-      facilitiesLayerView &&
-      facilitiesLayerView.filter &&
-      facilitiesLayerView.filter.where
-    ) {
-
-      return facilitiesLayerView.filter.where;
-
-    }
-
-    return "1=1";
-
-  }
-
-
-  // =========================================================
-  // SELECT / DESELECT ALL
-  // =========================================================
-
-  selectAllFilters.addEventListener(
+pointModeButton.addEventListener(
     "click",
-    async function () {
+    function () {
 
-      document
-        .querySelectorAll(
-          ".sport-filter, .owner-filter, .surface-filter, .floodlight-filter"
-        )
-        .forEach(
-          function (checkbox) {
-            checkbox.checked = true;
-          }
+        setMode(
+            "point"
         );
 
-
-      facilitiesLayerView.filter = null;
-
-      clearSelection();
-
-      await updateResultCount();
-
     }
-  );
+);
 
 
-  deselectAllFilters.addEventListener(
+spiderModeButton.addEventListener(
     "click",
-    async function () {
+    function () {
 
-      document
-        .querySelectorAll(
-          ".sport-filter, .owner-filter, .surface-filter, .floodlight-filter"
-        )
-        .forEach(
-          function (checkbox) {
-            checkbox.checked = false;
-          }
-        );
-
-
-      facilitiesLayerView.filter = {
-        where: "1=0"
-      };
-
-
-      clearSelection();
-
-      await updateResultCount();
-
-    }
-  );
-
-
-  // =========================================================
-  // RESULT COUNT
-  // =========================================================
-
-  async function updateResultCount() {
-
-    if (!facilitiesLayerView) {
-      return;
-    }
-
-
-    try {
-
-      const query =
-        facilitiesLayer.createQuery();
-
-
-      query.where =
-        getCurrentWhereClause();
-
-
-      const count =
-        await facilitiesLayer.queryFeatureCount(
-          query
-        );
-
-
-      resultCount.textContent =
-        count.toLocaleString("en-IE") +
-        (
-          count === 1
-            ? " facility"
-            : " facilities"
+        setMode(
+            "spider"
         );
 
     }
-    catch (error) {
+);
 
-      console.error(
-        "COUNT ERROR:",
-        error
-      );
 
-    }
 
-  }
+function setMode(
+    mode
+) {
 
+    currentMode =
+        mode;
 
-  // =========================================================
-  // MAP CLICK
-  // =========================================================
 
-  view.on(
-    "click",
-    async function (event) {
+    const spiderMode =
+        mode ===
+        "spider";
 
-      try {
 
-        const clickedPoint =
-          event.mapPoint;
-
-
-        if (!clickedPoint) {
-          clearSelection();
-          return;
-        }
-
-
-        const topLeft =
-          view.toMap({
-            x:
-              event.x -
-              CLICK_TOLERANCE_PIXELS,
-
-            y:
-              event.y -
-              CLICK_TOLERANCE_PIXELS
-          });
-
-
-        const bottomRight =
-          view.toMap({
-            x:
-              event.x +
-              CLICK_TOLERANCE_PIXELS,
-
-            y:
-              event.y +
-              CLICK_TOLERANCE_PIXELS
-          });
-
-
-        if (!topLeft || !bottomRight) {
-          clearSelection();
-          return;
-        }
-
-
-        const searchExtent =
-          new Extent({
-
-            xmin:
-              Math.min(
-                topLeft.x,
-                bottomRight.x
-              ),
-
-            ymin:
-              Math.min(
-                topLeft.y,
-                bottomRight.y
-              ),
-
-            xmax:
-              Math.max(
-                topLeft.x,
-                bottomRight.x
-              ),
-
-            ymax:
-              Math.max(
-                topLeft.y,
-                bottomRight.y
-              ),
-
-            spatialReference:
-              view.spatialReference
-
-          });
-
-
-        const query =
-          facilitiesLayer.createQuery();
-
-
-        query.geometry =
-          searchExtent;
-
-        query.spatialRelationship =
-          "intersects";
-
-        query.where =
-          getCurrentWhereClause();
-
-        query.returnGeometry =
-          true;
-
-        query.outFields = [
-          "OBJECTID",
-          "Sport",
-          "Infrastructure_Type",
-          "Surface",
-          "Floodlights",
-          "Owner",
-          "Facility_Size",
-          "Owner_Name",
-          "Quality",
-          "Local_Authority",
-          "LEA",
-          "Multi_Use",
-          "Area_msq"
-        ];
-
-
-        const response =
-          await facilitiesLayer.queryFeatures(
-            query
-          );
-
-
-        const nearby =
-          response.features || [];
-
-
-        if (nearby.length === 0) {
-          clearSelection();
-          return;
-        }
-
-
-        const overlapping =
-          nearby.filter(
-            function (facility) {
-
-              if (!facility.geometry) {
-                return false;
-              }
-
-              try {
-
-                return geometryEngine.intersects(
-                  facility.geometry,
-                  clickedPoint
-                );
-
-              }
-              catch (error) {
-
-                return false;
-
-              }
-
-            }
-          );
-
-
-        if (overlapping.length > 0) {
-
-          overlapping.sort(
-            function (a, b) {
-
-              return (
-                getPolygonArea(a.geometry) -
-                getPolygonArea(b.geometry)
-              );
-
-            }
-          );
-
-
-          selectFacilities(
-            overlapping
-          );
-
-          return;
-        }
-
-
-        let nearestFacility = null;
-        let nearestDistance = Infinity;
-
-
-        nearby.forEach(
-          function (facility) {
-
-            if (!facility.geometry) {
-              return;
-            }
-
-
-            let distance;
-
-
-            try {
-
-              distance =
-                geometryEngine.distance(
-                  clickedPoint,
-                  facility.geometry
-                );
-
-            }
-            catch (error) {
-
-              distance = Infinity;
-
-            }
-
-
-            if (
-              Number.isFinite(distance) &&
-              distance < nearestDistance
-            ) {
-
-              nearestDistance =
-                distance;
-
-              nearestFacility =
-                facility;
-
-            }
-
-          }
-        );
-
-
-        selectFacilities([
-          nearestFacility || nearby[0]
-        ]);
-
-      }
-      catch (error) {
-
-        console.error(
-          "FACILITY SELECTION ERROR:",
-          error
-        );
-
-      }
-
-    }
-  );
-
-
-  // =========================================================
-  // SELECTION
-  // =========================================================
-
-  function selectFacilities(graphics) {
-
-    clearMapHighlightsOnly();
-
-
-    selectedGraphics =
-      graphics || [];
-
-
-    if (selectedGraphics.length === 0) {
-      clearSelection();
-      return;
-    }
-
-
-    selectedIndex = 0;
-
-
-    const objectIds =
-      selectedGraphics
-        .map(
-          function (graphic) {
-            return graphic.getObjectId();
-          }
-        )
-        .filter(
-          function (id) {
-            return id !== null && id !== undefined;
-          }
-        );
-
-
-    if (
-      facilitiesLayerView &&
-      objectIds.length > 0
-    ) {
-
-      highlightHandle =
-        facilitiesLayerView.highlight(
-          objectIds
-        );
-
-    }
-
-
-    showCurrentFacility();
-
-  }
-
-
-  function showCurrentFacility() {
-
-    selectedGraphic =
-      selectedGraphics[selectedIndex];
-
-
-    updateCurrentOverlay();
-
-    showFacilityDetails(
-      selectedGraphic.attributes
+    pointModeButton.classList.toggle(
+        "active",
+        !spiderMode
     );
 
-    updateSelectionNavigator();
 
-  }
-
-
-  function updateCurrentOverlay() {
-
-    if (currentOverlayGraphic) {
-
-      view.graphics.remove(
-        currentOverlayGraphic
-      );
-
-      currentOverlayGraphic = null;
-
-    }
-
-
-    if (
-      !selectedGraphic ||
-      !selectedGraphic.geometry
-    ) {
-      return;
-    }
-
-
-    currentOverlayGraphic =
-      selectedGraphic.clone();
-
-
-    currentOverlayGraphic.symbol = {
-      type: "simple-fill",
-
-      color: [
-        0,
-        170,
-        150,
-        0.06
-      ],
-
-      outline: {
-        color: [
-          0,
-          90,
-          75,
-          1
-        ],
-
-        width: 4
-      }
-    };
-
-
-    view.graphics.add(
-      currentOverlayGraphic
+    spiderModeButton.classList.toggle(
+        "active",
+        spiderMode
     );
 
-  }
+
+    pointSearchControls.classList.toggle(
+        "hidden",
+        spiderMode
+    );
 
 
-  // =========================================================
-  // MULTIPLE FACILITIES
-  // =========================================================
-
-  function updateSelectionNavigator() {
-
-    if (selectedGraphics.length > 1) {
-
-      selectionNavigator.classList.remove(
-        "hidden"
-      );
+    spiderControls.classList.toggle(
+        "hidden",
+        !spiderMode
+    );
 
 
-      selectionPosition.textContent =
-        `${selectedIndex + 1} of ${selectedGraphics.length}`;
+    centreTarget.classList.toggle(
+        "hidden",
+        !spiderMode
+    );
+
+
+    clearCurrentResults();
+
+
+    if (spiderMode) {
+
+        searchPoint =
+            null;
+
+
+        regionalFeatures =
+            [];
+
+
+        cacheCentre =
+            null;
+
+
+        refreshSpiderMode(
+            true
+        );
 
     }
     else {
 
-      selectionNavigator.classList.add(
-        "hidden"
-      );
+        setOriginPoint(
+            null
+        );
+
+
+        mapStatus.textContent =
+            "Point Search";
 
     }
 
-  }
+}
 
 
-  previousFacility.addEventListener(
+
+async function loadSportValues() {
+
+    try {
+
+        const url =
+            new URL(
+                FACILITIES_URL
+            );
+
+
+        url.searchParams.set(
+            "where",
+            BASE_WHERE
+        );
+
+
+        url.searchParams.set(
+            "outFields",
+            "Sport"
+        );
+
+
+        url.searchParams.set(
+            "returnGeometry",
+            "false"
+        );
+
+
+        url.searchParams.set(
+            "returnDistinctValues",
+            "true"
+        );
+
+
+        url.searchParams.set(
+            "orderByFields",
+            "Sport ASC"
+        );
+
+
+        url.searchParams.set(
+            "f",
+            "json"
+        );
+
+
+        const response =
+            await fetch(
+                url.toString()
+            );
+
+
+        const data =
+            await response.json();
+
+
+        const sports =
+            [
+                ...new Set(
+
+                    (
+                        data.features ||
+                        []
+                    )
+
+                    .map(
+                        function (feature) {
+
+                            return (
+                                feature.attributes &&
+                                feature.attributes.Sport
+                            );
+
+                        }
+                    )
+
+                    .filter(
+                        Boolean
+                    )
+
+                )
+            ];
+
+
+        sports.sort(
+            function (a, b) {
+
+                return a.localeCompare(
+                    b
+                );
+
+            }
+        );
+
+
+        sports.forEach(
+            function (sport) {
+
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+
+                option.value =
+                    sport;
+
+
+                option.textContent =
+                    sport;
+
+
+                sportSelect.appendChild(
+                    option
+                );
+
+            }
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "SPORT LOAD ERROR:",
+            error
+        );
+
+    }
+
+}
+
+
+
+sportSelect.addEventListener(
+    "change",
+    async function () {
+
+        selectedSport =
+            sportSelect.value;
+
+
+        regionalFeatures =
+            [];
+
+
+        cacheCentre =
+            null;
+
+
+        cacheSport =
+            null;
+
+
+        if (
+            currentMode ===
+            "spider"
+        ) {
+
+            await refreshSpiderMode(
+                true
+            );
+
+        }
+        else if (
+            searchPoint
+        ) {
+
+            await runPointSearch(
+                searchPoint,
+                true
+            );
+
+        }
+
+    }
+);
+
+
+
+searchButton.addEventListener(
     "click",
+    runPlaceSearch
+);
+
+
+placeSearch.addEventListener(
+    "keydown",
+    function (event) {
+
+        if (
+            event.key ===
+            "Enter"
+        ) {
+
+            runPlaceSearch();
+
+        }
+
+    }
+);
+
+
+
+async function runPlaceSearch() {
+
+    const query =
+        placeSearch.value.trim();
+
+
+    if (!query) {
+
+        searchMessage.textContent =
+            "Enter a town, address or place.";
+
+        return;
+
+    }
+
+
+    searchMessage.textContent =
+        "Searching…";
+
+
+    try {
+
+        const url =
+            "https://nominatim.openstreetmap.org/search"
+            +
+            "?format=json"
+            +
+            "&limit=1"
+            +
+            "&countrycodes=ie"
+            +
+            "&q="
+            +
+            encodeURIComponent(
+                query
+            );
+
+
+        const response =
+            await fetch(
+                url,
+                {
+                    headers: {
+                        "Accept-Language":
+                            "en"
+                    }
+                }
+            );
+
+
+        const results =
+            await response.json();
+
+
+        if (
+            !results ||
+            results.length === 0
+        ) {
+
+            searchMessage.textContent =
+                "Location not found.";
+
+            return;
+
+        }
+
+
+        const lon =
+            Number(
+                results[0].lon
+            );
+
+
+        const lat =
+            Number(
+                results[0].lat
+            );
+
+
+        searchPoint = [
+            lon,
+            lat
+        ];
+
+
+        searchMessage.textContent =
+            results[0].display_name;
+
+
+        map.flyTo(
+            {
+                center:
+                    searchPoint,
+
+                zoom:
+                    Math.max(
+                        map.getZoom(),
+                        11
+                    )
+            }
+        );
+
+
+        await runPointSearch(
+            searchPoint,
+            true
+        );
+
+    }
+    catch (error) {
+
+        console.error(
+            "PLACE SEARCH ERROR:",
+            error
+        );
+
+
+        searchMessage.textContent =
+            "Unable to search for that location.";
+
+    }
+
+}
+
+
+
+useMapCentreButton.addEventListener(
+    "click",
+    async function () {
+
+        const centre =
+            map.getCenter();
+
+
+        searchPoint = [
+            centre.lng,
+            centre.lat
+        ];
+
+
+        searchMessage.textContent =
+            "Using current map centre.";
+
+
+        await runPointSearch(
+            searchPoint,
+            true
+        );
+
+    }
+);
+
+
+
+map.on(
+    "move",
     function () {
 
-      if (selectedGraphics.length <= 1) {
-        return;
-      }
+        if (
+            currentMode !==
+            "spider"
+        ) {
+
+            return;
+
+        }
 
 
-      selectedIndex =
-        (
-          selectedIndex -
-          1 +
-          selectedGraphics.length
-        )
-        %
-        selectedGraphics.length;
+        const centre =
+            map.getCenter();
 
 
-      showCurrentFacility();
-
-    }
-  );
-
-
-  nextFacility.addEventListener(
-    "click",
-    function () {
-
-      if (selectedGraphics.length <= 1) {
-        return;
-      }
+        const centrePoint = [
+            centre.lng,
+            centre.lat
+        ];
 
 
-      selectedIndex =
-        (
-          selectedIndex +
-          1
-        )
-        %
-        selectedGraphics.length;
+        if (
+            regionalFeatures.length >
+            0
+        ) {
 
+            calculateNearest(
+                centrePoint
+            );
 
-      showCurrentFacility();
+        }
 
     }
-  );
+);
 
 
-  // =========================================================
-  // AREA
-  // =========================================================
 
-  function getPolygonArea(geometry) {
+map.on(
+    "moveend",
+    async function () {
 
-    if (!geometry) {
-      return Infinity;
+        if (
+            currentMode !==
+            "spider"
+        ) {
+
+            return;
+
+        }
+
+
+        await refreshSpiderMode(
+            false
+        );
+
+    }
+);
+
+
+
+async function refreshSpiderMode(
+    force
+) {
+
+    const centre =
+        map.getCenter();
+
+
+    const centrePoint = [
+        centre.lng,
+        centre.lat
+    ];
+
+
+    const needsRefresh =
+        force ||
+        !cacheCentre ||
+        cacheSport !==
+            selectedSport ||
+        distanceKm(
+            cacheCentre,
+            centrePoint
+        ) >
+            CACHE_RADIUS_KM *
+            0.45;
+
+
+    if (
+        needsRefresh
+    ) {
+
+        await fetchRegionalFacilities(
+            centrePoint
+        );
+
+    }
+
+
+    calculateNearest(
+        centrePoint
+    );
+
+}
+
+
+
+async function runPointSearch(
+    point,
+    force
+) {
+
+    const needsRefresh =
+        force ||
+        !cacheCentre ||
+        cacheSport !==
+            selectedSport ||
+        distanceKm(
+            cacheCentre,
+            point
+        ) >
+            CACHE_RADIUS_KM *
+            0.45;
+
+
+    if (
+        needsRefresh
+    ) {
+
+        await fetchRegionalFacilities(
+            point
+        );
+
+    }
+
+
+    setOriginPoint(
+        point
+    );
+
+
+    calculateNearest(
+        point
+    );
+
+}
+
+
+
+async function fetchRegionalFacilities(
+    centre
+) {
+
+    const requestId =
+        ++fetchRequestId;
+
+
+    resultsStatus.textContent =
+        "Loading";
+
+
+    mapStatus.textContent =
+        "Loading nearby facilities…";
+
+
+    try {
+
+        const bbox =
+            bboxAroundPoint(
+                centre,
+                CACHE_RADIUS_KM
+            );
+
+
+        const whereParts = [
+            BASE_WHERE
+        ];
+
+
+        if (
+            selectedSport
+        ) {
+
+            whereParts.push(
+                "Sport = '"
+                +
+                escapeSql(
+                    selectedSport
+                )
+                +
+                "'"
+            );
+
+        }
+
+
+        const where =
+            whereParts.join(
+                " AND "
+            );
+
+
+        const allFeatures =
+            [];
+
+
+        let offset =
+            0;
+
+
+        while (true) {
+
+            const page =
+                await queryFacilitiesPage(
+                    where,
+                    bbox,
+                    offset
+                );
+
+
+            if (
+                requestId !==
+                fetchRequestId
+            ) {
+
+                return;
+
+            }
+
+
+            allFeatures.push(
+                ...page.features
+            );
+
+
+            if (
+                page.features.length <
+                PAGE_SIZE
+            ) {
+
+                break;
+
+            }
+
+
+            offset +=
+                PAGE_SIZE;
+
+        }
+
+
+        if (
+            requestId !==
+            fetchRequestId
+        ) {
+
+            return;
+
+        }
+
+
+        regionalFeatures =
+            allFeatures;
+
+
+        cacheCentre =
+            centre.slice();
+
+
+        cacheSport =
+            selectedSport;
+
+
+        mapStatus.textContent =
+            regionalFeatures.length.toLocaleString(
+                "en-IE"
+            )
+            +
+            " facilities cached";
+
+
+        resultsStatus.textContent =
+            "Ready";
+
+    }
+    catch (error) {
+
+        console.error(
+            "FACILITY LOAD ERROR:",
+            error
+        );
+
+
+        mapStatus.textContent =
+            "Unable to load facilities";
+
+
+        resultsStatus.textContent =
+            "Error";
+
+    }
+
+}
+
+
+
+async function queryFacilitiesPage(
+    where,
+    bbox,
+    offset
+) {
+
+    const url =
+        new URL(
+            FACILITIES_URL
+        );
+
+
+    url.searchParams.set(
+        "where",
+        where
+    );
+
+
+    url.searchParams.set(
+        "geometry",
+        bbox.join(
+            ","
+        )
+    );
+
+
+    url.searchParams.set(
+        "geometryType",
+        "esriGeometryEnvelope"
+    );
+
+
+    url.searchParams.set(
+        "inSR",
+        "4326"
+    );
+
+
+    url.searchParams.set(
+        "spatialRel",
+        "esriSpatialRelIntersects"
+    );
+
+
+    url.searchParams.set(
+        "outSR",
+        "4326"
+    );
+
+
+    url.searchParams.set(
+        "outFields",
+        [
+            "OBJECTID",
+            "GlobalID",
+            "Sport",
+            "Infrastructure_Type",
+            "Surface",
+            "Floodlights",
+            "Owner",
+            "Owner_Name",
+            "Facility_Size",
+            "Quality",
+            "Local_Authority",
+            "LEA",
+            "Multi_Use",
+            "Area_msq",
+            "Validation"
+        ].join(
+            ","
+        )
+    );
+
+
+    url.searchParams.set(
+        "returnGeometry",
+        "true"
+    );
+
+
+    url.searchParams.set(
+        "resultOffset",
+        String(
+            offset
+        )
+    );
+
+
+    url.searchParams.set(
+        "resultRecordCount",
+        String(
+            PAGE_SIZE
+        )
+    );
+
+
+    url.searchParams.set(
+        "orderByFields",
+        "OBJECTID ASC"
+    );
+
+
+    url.searchParams.set(
+        "f",
+        "geojson"
+    );
+
+
+    const response =
+        await fetch(
+            url.toString()
+        );
+
+
+    if (
+        !response.ok
+    ) {
+
+        throw new Error(
+            "Facility query failed"
+        );
+
+    }
+
+
+    return await response.json();
+
+}
+
+
+
+function calculateNearest(
+    origin
+) {
+
+    if (
+        !origin ||
+        regionalFeatures.length ===
+            0
+    ) {
+
+        clearCurrentResults();
+
+        return;
+
+    }
+
+
+    const originPoint =
+        turf.point(
+            origin
+        );
+
+
+    const scored =
+        regionalFeatures
+
+            .map(
+                function (feature) {
+
+                    const distance =
+                        distanceToFeatureKm(
+                            originPoint,
+                            feature
+                        );
+
+
+                    return {
+                        feature:
+                            feature,
+
+                        distance:
+                            distance
+                    };
+
+                }
+            )
+
+            .filter(
+                function (item) {
+
+                    return (
+                        Number.isFinite(
+                            item.distance
+                        )
+                    );
+
+                }
+            )
+
+            .sort(
+                function (a, b) {
+
+                    return (
+                        a.distance -
+                        b.distance
+                    );
+
+                }
+            )
+
+            .slice(
+                0,
+                NEAREST_COUNT
+            );
+
+
+    nearestFeatures =
+        scored;
+
+
+    updateMapResults(
+        origin,
+        scored
+    );
+
+
+    renderResults(
+        scored
+    );
+
+
+    updateMetrics(
+        scored
+    );
+
+}
+
+
+
+function distanceToFeatureKm(
+    originPoint,
+    feature
+) {
+
+    try {
+
+        if (
+            turf.booleanPointInPolygon(
+                originPoint,
+                feature
+            )
+        ) {
+
+            return 0;
+
+        }
+
+    }
+    catch (error) {
     }
 
 
     try {
 
-      const area =
-        Math.abs(
-          geometryEngine.geodesicArea(
-            geometry,
-            "square-meters"
-          )
+        const boundary =
+            turf.polygonToLine(
+                feature
+            );
+
+
+        return turf.pointToLineDistance(
+            originPoint,
+            boundary,
+            {
+                units:
+                    "kilometers"
+            }
         );
-
-
-      if (
-        Number.isFinite(area) &&
-        area > 0
-      ) {
-        return area;
-      }
 
     }
     catch (error) {
-      // fallback
+
+        try {
+
+            const centre =
+                turf.centerOfMass(
+                    feature
+                );
+
+
+            return turf.distance(
+                originPoint,
+                centre,
+                {
+                    units:
+                        "kilometers"
+                }
+            );
+
+        }
+        catch (fallbackError) {
+
+            return Infinity;
+
+        }
+
     }
 
-
-    if (geometry.extent) {
-
-      return (
-        geometry.extent.width *
-        geometry.extent.height
-      );
-
-    }
+}
 
 
-    return Infinity;
 
-  }
+function updateMapResults(
+    origin,
+    scored
+) {
 
+    const features =
+        scored.map(
+            function (item) {
 
-  // =========================================================
-  // DETAILS
-  // =========================================================
-
-  function showFacilityDetails(attributes) {
-
-    if (!attributes) {
-      return;
-    }
-
-
-    let title =
-      cleanValue(
-        attributes.Owner_Name
-      );
+                const clone =
+                    JSON.parse(
+                        JSON.stringify(
+                            item.feature
+                        )
+                    );
 
 
-    if (title === "Not recorded") {
+                clone.properties =
+                    clone.properties ||
+                    {};
 
-      const sport =
-        cleanValue(
-          attributes.Sport
+
+                clone.properties.__distance_km =
+                    item.distance;
+
+
+                return clone;
+
+            }
         );
 
-      const type =
-        cleanValue(
-          attributes.Infrastructure_Type
+
+    const facilitySource =
+        map.getSource(
+            "nearest-facilities"
         );
 
 
-      title =
-        sport !== "Not recorded" &&
-        type !== "Not recorded"
+    if (facilitySource) {
 
-          ? `${sport} - ${type}`
+        facilitySource.setData(
+            {
+                type:
+                    "FeatureCollection",
 
-          : `${sport} facility`;
-
-    }
-
-
-    setText(
-      "detailTitle",
-      title
-    );
-
-    setText(
-      "detailSportTag",
-      displaySportName(
-        attributes.Sport
-      )
-    );
-
-    setSportTagColour(
-      attributes.Sport
-    );
-
-    setText(
-      "detailTypeTag",
-      cleanValue(
-        attributes.Infrastructure_Type
-      )
-    );
-
-    setText(
-      "detailSport",
-      displaySportName(
-        attributes.Sport
-      )
-    );
-
-    setText(
-      "detailInfrastructure",
-      cleanValue(
-        attributes.Infrastructure_Type
-      )
-    );
-
-    setText(
-      "detailSurface",
-      cleanValue(
-        attributes.Surface
-      )
-    );
-
-    setText(
-      "detailFloodlights",
-      formatFloodlights(
-        attributes.Floodlights
-      )
-    );
-
-    setText(
-      "detailOwner",
-      cleanValue(
-        attributes.Owner
-      )
-    );
-
-    setText(
-      "detailOwnerName",
-      cleanValue(
-        attributes.Owner_Name
-      )
-    );
-
-    setText(
-      "detailSize",
-      cleanValue(
-        attributes.Facility_Size
-      )
-    );
-
-    setText(
-      "detailQuality",
-      formatQuality(
-        attributes.Quality
-      )
-    );
-
-    setText(
-      "detailMultiUse",
-      cleanValue(
-        attributes.Multi_Use
-      )
-    );
-
-    setText(
-      "detailLA",
-      titleCase(
-        attributes.Local_Authority
-      )
-    );
-
-    setText(
-      "detailLEA",
-      titleCase(
-        attributes.LEA
-      )
-    );
-
-    setText(
-      "detailArea",
-      formatArea(
-        attributes.Area_msq
-      )
-    );
-
-
-    emptyState.classList.add(
-      "hidden"
-    );
-
-    facilityDetails.classList.remove(
-      "hidden"
-    );
-
-  }
-
-
-  function displaySportName(value) {
-
-    if (value === "Sports Hall") {
-      return "Sports Halls";
-    }
-
-    return cleanValue(value);
-
-  }
-
-
-  function setSportTagColour(sport) {
-
-    const tag =
-      document.getElementById(
-        "detailSportTag"
-      );
-
-
-    const colour =
-      sportColours[sport] ||
-      [130, 130, 130];
-
-
-    tag.style.backgroundColor =
-      `rgb(${colour[0]},${colour[1]},${colour[2]})`;
-
-  }
-
-
-  // =========================================================
-  // CLEAR
-  // =========================================================
-
-  function clearMapHighlightsOnly() {
-
-    if (highlightHandle) {
-
-      highlightHandle.remove();
-
-      highlightHandle = null;
+                features:
+                    features
+            }
+        );
 
     }
 
 
-    if (currentOverlayGraphic) {
+    const spiderLines =
+        scored.map(
+            function (item) {
 
-      view.graphics.remove(
-        currentOverlayGraphic
-      );
+                const target =
+                    facilityPoint(
+                        item.feature
+                    );
 
-      currentOverlayGraphic = null;
+
+                return turf.lineString(
+                    [
+                        origin,
+                        target
+                    ],
+                    {
+                        OBJECTID:
+                            item.feature.properties
+                                .OBJECTID
+                    }
+                );
+
+            }
+        );
+
+
+    const spiderSource =
+        map.getSource(
+            "spider-lines"
+        );
+
+
+    if (spiderSource) {
+
+        spiderSource.setData(
+            {
+                type:
+                    "FeatureCollection",
+
+                features:
+                    spiderLines
+            }
+        );
 
     }
 
-  }
+
+    if (
+        currentMode ===
+        "point"
+    ) {
+
+        setOriginPoint(
+            origin
+        );
+
+    }
+    else {
+
+        setOriginPoint(
+            null
+        );
+
+    }
+
+}
 
 
-  function clearSelection() {
 
-    clearMapHighlightsOnly();
+function setOriginPoint(
+    point
+) {
 
-
-    selectedGraphics = [];
-    selectedIndex = 0;
-    selectedGraphic = null;
-
-
-    selectionNavigator.classList.add(
-      "hidden"
-    );
-
-    facilityDetails.classList.add(
-      "hidden"
-    );
-
-    emptyState.classList.remove(
-      "hidden"
-    );
-
-  }
+    const source =
+        map.getSource(
+            "origin-point"
+        );
 
 
-  closeDetails.addEventListener(
-    "click",
-    clearSelection
-  );
+    if (!source) {
 
-
-  // =========================================================
-  // ZOOM
-  // =========================================================
-
-  zoomToFacility.addEventListener(
-    "click",
-    async function () {
-
-      if (
-        !selectedGraphic ||
-        !selectedGraphic.geometry
-      ) {
         return;
-      }
-
-
-      try {
-
-        const geometry =
-          selectedGraphic.geometry;
-
-
-        const target =
-          geometry.extent
-            ? geometry.extent.expand(2.2)
-            : geometry;
-
-
-        view.padding = {
-          top: 20,
-          right: 140,
-          bottom: 20,
-          left: 20
-        };
-
-
-        await view.goTo(
-          target,
-          {
-            duration: 800
-          }
-        );
-
-      }
-      catch (error) {
-
-        if (error.name !== "AbortError") {
-
-          console.error(
-            "ZOOM ERROR:",
-            error
-          );
-
-        }
-
-      }
 
     }
-  );
 
 
-  // =========================================================
-  // FULL IRELAND
-  // =========================================================
+    if (!point) {
 
-  homeButton.addEventListener(
-    "click",
-    async function () {
-
-      try {
-
-        view.padding = {
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0
-        };
-
-
-        await view.goTo(
-          {
-            center: IRELAND_CENTER,
-            zoom: IRELAND_ZOOM
-          },
-          {
-            duration: 900
-          }
+        source.setData(
+            emptyFeatureCollection()
         );
 
-      }
-      catch (error) {
-
-        if (error.name !== "AbortError") {
-
-          console.error(
-            "HOME VIEW ERROR:",
-            error
-          );
-
-        }
-
-      }
+        return;
 
     }
-  );
 
 
-  // =========================================================
-  // FORMATTERS
-  // =========================================================
-
-  function formatQuality(value) {
-
-    const labels = {
-      1: "Poor",
-      2: "Good / Satisfactory",
-      3: "Excellent"
-    };
-
-
-    return (
-      labels[value] ||
-      cleanValue(value)
+    source.setData(
+        turf.featureCollection(
+            [
+                turf.point(
+                    point
+                )
+            ]
+        )
     );
 
-  }
+}
 
 
-  function formatFloodlights(value) {
 
-    if (value === "Floodlights") {
-      return "Yes";
+function renderResults(
+    scored
+) {
+
+    resultsList.innerHTML =
+        "";
+
+
+    if (
+        scored.length ===
+        0
+    ) {
+
+        resultsList.innerHTML =
+            '<div class="search-message">No facilities found.</div>';
+
+        return;
+
     }
 
 
-    if (value === "No Floodlights") {
-      return "No";
-    }
+    scored.forEach(
+        function (
+            item,
+            index
+        ) {
+
+            const feature =
+                item.feature;
 
 
-    return cleanValue(value);
-
-  }
-
-
-  function titleCase(value) {
-
-    const cleaned =
-      cleanValue(value);
+            const props =
+                feature.properties ||
+                {};
 
 
-    if (cleaned === "Not recorded") {
-      return cleaned;
-    }
+            const card =
+                document.createElement(
+                    "div"
+                );
 
 
-    return cleaned
-      .toLowerCase()
-      .replace(
-        /\b\w/g,
-        function (letter) {
-          return letter.toUpperCase();
+            card.className =
+                "result-card";
+
+
+            const name =
+                facilityName(
+                    props
+                );
+
+
+            const sport =
+                cleanValue(
+                    props.Sport
+                );
+
+
+            const type =
+                cleanValue(
+                    props.Infrastructure_Type
+                );
+
+
+            card.innerHTML =
+                `
+                <div class="result-title-row">
+
+                    <span class="result-rank">
+                        ${index + 1}
+                    </span>
+
+                    <span class="result-title">
+                        ${escapeHtml(name)}
+                    </span>
+
+                </div>
+
+                <div class="result-meta">
+
+                    <span>
+                        ${escapeHtml(sport)}
+                    </span>
+
+                    <span>
+                        ${escapeHtml(type)}
+                    </span>
+
+                    <span class="result-distance">
+                        ${formatDistance(item.distance)}
+                    </span>
+
+                </div>
+                `;
+
+
+            card.addEventListener(
+                "click",
+                function () {
+
+                    zoomToFeature(
+                        feature
+                    );
+
+
+                    showFeaturePopup(
+                        feature
+                    );
+
+                }
+            );
+
+
+            resultsList.appendChild(
+                card
+            );
+
         }
-      );
+    );
 
-  }
-
-
-  function setText(id, value) {
-
-    const element =
-      document.getElementById(id);
+}
 
 
-    if (element) {
-      element.textContent = value;
-    }
 
-  }
+function updateMetrics(
+    scored
+) {
 
+    facilityCount.textContent =
+        scored.length;
 
-  function cleanValue(value) {
 
     if (
-      value === null ||
-      value === undefined ||
-      value === "" ||
-      value === " " ||
-      value === "NULL"
+        scored.length ===
+        0
     ) {
 
-      return "Not recorded";
+        averageDistance.textContent =
+            "—";
+
+        return;
 
     }
 
 
-    return String(value);
+    const average =
+        scored.reduce(
+            function (
+                sum,
+                item
+            ) {
 
-  }
+                return (
+                    sum +
+                    item.distance
+                );
+
+            },
+            0
+        )
+        /
+        scored.length;
 
 
-  function formatArea(value) {
+    averageDistance.textContent =
+        formatDistance(
+            average
+        );
 
-    if (
-      value === null ||
-      value === undefined ||
-      value === "" ||
-      isNaN(Number(value))
-    ) {
+}
 
-      return "Not recorded";
+
+
+map.on(
+    "click",
+    "nearest-facilities-fill",
+    function (event) {
+
+        if (
+            !event.features ||
+            event.features.length ===
+                0
+        ) {
+
+            return;
+
+        }
+
+
+        const clicked =
+            event.features[0];
+
+
+        const objectId =
+            clicked.properties &&
+            clicked.properties.OBJECTID;
+
+
+        const match =
+            nearestFeatures.find(
+                function (item) {
+
+                    return (
+                        String(
+                            item.feature.properties
+                                .OBJECTID
+                        )
+                        ===
+                        String(
+                            objectId
+                        )
+                    );
+
+                }
+            );
+
+
+        if (match) {
+
+            zoomToFeature(
+                match.feature
+            );
+
+
+            showFeaturePopup(
+                match.feature
+            );
+
+        }
 
     }
+);
+
+
+
+map.on(
+    "mouseenter",
+    "nearest-facilities-fill",
+    function () {
+
+        map.getCanvas().style.cursor =
+            "pointer";
+
+    }
+);
+
+
+map.on(
+    "mouseleave",
+    "nearest-facilities-fill",
+    function () {
+
+        map.getCanvas().style.cursor =
+            "";
+
+    }
+);
+
+
+
+function showFeaturePopup(
+    feature
+) {
+
+    const props =
+        feature.properties ||
+        {};
+
+
+    const point =
+        facilityPoint(
+            feature
+        );
+
+
+    const name =
+        facilityName(
+            props
+        );
+
+
+    const sport =
+        cleanValue(
+            props.Sport
+        );
+
+
+    const type =
+        cleanValue(
+            props.Infrastructure_Type
+        );
+
+
+    const owner =
+        cleanValue(
+            props.Owner_Name
+        );
 
 
     const area =
-      Number(value);
+        formatArea(
+            props.Area_msq
+        );
 
 
-    if (area >= 10000) {
+    new maplibregl.Popup({
+        closeButton:
+            true,
 
-      return (
-        (area / 10000)
-          .toLocaleString(
-            "en-IE",
+        closeOnClick:
+            true
+    })
+
+        .setLngLat(
+            point
+        )
+
+        .setHTML(
+            `
+            <div class="popup-title">
+                ${escapeHtml(name)}
+            </div>
+
+            <div class="popup-row">
+                <strong>Sport:</strong>
+                ${escapeHtml(sport)}
+            </div>
+
+            <div class="popup-row">
+                <strong>Type:</strong>
+                ${escapeHtml(type)}
+            </div>
+
+            <div class="popup-row">
+                <strong>Owner:</strong>
+                ${escapeHtml(owner)}
+            </div>
+
+            <div class="popup-row">
+                <strong>Area:</strong>
+                ${escapeHtml(area)}
+            </div>
+            `
+        )
+
+        .addTo(
+            map
+        );
+
+}
+
+
+
+function zoomToFeature(
+    feature
+) {
+
+    try {
+
+        const bbox =
+            turf.bbox(
+                feature
+            );
+
+
+        map.fitBounds(
+            [
+                [
+                    bbox[0],
+                    bbox[1]
+                ],
+
+                [
+                    bbox[2],
+                    bbox[3]
+                ]
+            ],
             {
-              maximumFractionDigits: 2
+                padding:
+                    90,
+
+                maxZoom:
+                    16,
+
+                duration:
+                    700
             }
-          )
-        +
-        " ha"
-      );
+        );
+
+    }
+    catch (error) {
+
+        const point =
+            facilityPoint(
+                feature
+            );
+
+
+        map.flyTo(
+            {
+                center:
+                    point,
+
+                zoom:
+                    15
+            }
+        );
+
+    }
+
+}
+
+
+
+function facilityPoint(
+    feature
+) {
+
+    try {
+
+        const centre =
+            turf.centerOfMass(
+                feature
+            );
+
+
+        return (
+            centre.geometry.coordinates
+        );
+
+    }
+    catch (error) {
+
+        try {
+
+            const centre =
+                turf.center(
+                    feature
+                );
+
+
+            return (
+                centre.geometry.coordinates
+            );
+
+        }
+        catch (fallbackError) {
+
+            return IRELAND_CENTER;
+
+        }
+
+    }
+
+}
+
+
+
+function facilityName(
+    props
+) {
+
+    const ownerName =
+        cleanValueRaw(
+            props.Owner_Name
+        );
+
+
+    if (ownerName) {
+
+        return ownerName;
+
+    }
+
+
+    const sport =
+        cleanValueRaw(
+            props.Sport
+        );
+
+
+    const type =
+        cleanValueRaw(
+            props.Infrastructure_Type
+        );
+
+
+    if (
+        sport &&
+        type
+    ) {
+
+        return (
+            sport +
+            " - " +
+            type
+        );
+
+    }
+
+
+    if (sport) {
+
+        return (
+            sport +
+            " facility"
+        );
+
+    }
+
+
+    return "Sports facility";
+
+}
+
+
+
+fullIrelandButton.addEventListener(
+    "click",
+    function () {
+
+        map.flyTo(
+            {
+                center:
+                    IRELAND_CENTER,
+
+                zoom:
+                    IRELAND_ZOOM,
+
+                duration:
+                    800
+            }
+        );
+
+    }
+);
+
+
+
+function clearCurrentResults() {
+
+    nearestFeatures =
+        [];
+
+
+    resultsList.innerHTML =
+        "";
+
+
+    facilityCount.textContent =
+        "0";
+
+
+    averageDistance.textContent =
+        "—";
+
+
+    const facilitiesSource =
+        map.getSource(
+            "nearest-facilities"
+        );
+
+
+    if (facilitiesSource) {
+
+        facilitiesSource.setData(
+            emptyFeatureCollection()
+        );
+
+    }
+
+
+    const spiderSource =
+        map.getSource(
+            "spider-lines"
+        );
+
+
+    if (spiderSource) {
+
+        spiderSource.setData(
+            emptyFeatureCollection()
+        );
+
+    }
+
+}
+
+
+
+function bboxAroundPoint(
+    centre,
+    radiusKm
+) {
+
+    const lat =
+        centre[1];
+
+
+    const lon =
+        centre[0];
+
+
+    const latDelta =
+        radiusKm /
+        111.32;
+
+
+    const lonDelta =
+        radiusKm /
+        (
+            111.32 *
+            Math.cos(
+                lat *
+                Math.PI /
+                180
+            )
+        );
+
+
+    return [
+        lon -
+            lonDelta,
+
+        lat -
+            latDelta,
+
+        lon +
+            lonDelta,
+
+        lat +
+            latDelta
+    ];
+
+}
+
+
+
+function distanceKm(
+    pointA,
+    pointB
+) {
+
+    return turf.distance(
+        turf.point(
+            pointA
+        ),
+
+        turf.point(
+            pointB
+        ),
+
+        {
+            units:
+                "kilometers"
+        }
+    );
+
+}
+
+
+
+function formatDistance(
+    distance
+) {
+
+    if (
+        !Number.isFinite(
+            distance
+        )
+    ) {
+
+        return "—";
+
+    }
+
+
+    if (
+        distance <
+        1
+    ) {
+
+        return (
+            Math.round(
+                distance *
+                1000
+            )
+            +
+            " m"
+        );
 
     }
 
 
     return (
-      area.toLocaleString(
-        "en-IE",
-        {
-          maximumFractionDigits: 0
-        }
-      )
-      +
-      " m²"
+        distance.toLocaleString(
+            "en-IE",
+            {
+                maximumFractionDigits:
+                    1
+            }
+        )
+        +
+        " km"
     );
 
-  }
+}
 
-});
+
+
+function formatArea(
+    value
+) {
+
+    const area =
+        Number(
+            value
+        );
+
+
+    if (
+        !Number.isFinite(
+            area
+        )
+    ) {
+
+        return "Not recorded";
+
+    }
+
+
+    if (
+        area >=
+        10000
+    ) {
+
+        return (
+            (
+                area /
+                10000
+            ).toLocaleString(
+                "en-IE",
+                {
+                    maximumFractionDigits:
+                        2
+                }
+            )
+            +
+            " ha"
+        );
+
+    }
+
+
+    return (
+        area.toLocaleString(
+            "en-IE",
+            {
+                maximumFractionDigits:
+                    0
+            }
+        )
+        +
+        " m²"
+    );
+
+}
+
+
+
+function cleanValue(
+    value
+) {
+
+    const cleaned =
+        cleanValueRaw(
+            value
+        );
+
+
+    return (
+        cleaned ||
+        "Not recorded"
+    );
+
+}
+
+
+
+function cleanValueRaw(
+    value
+) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === "" ||
+        value === " " ||
+        value === "NULL"
+    ) {
+
+        return "";
+
+    }
+
+
+    return String(
+        value
+    );
+
+}
+
+
+
+function escapeSql(
+    value
+) {
+
+    return String(
+        value
+    ).replace(
+        /'/g,
+        "''"
+    );
+
+}
+
+
+
+function escapeHtml(
+    value
+) {
+
+    return String(
+        value
+    )
+
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+
+        .replace(
+            /</g,
+            "&lt;"
+        )
+
+        .replace(
+            />/g,
+            "&gt;"
+        )
+
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+
+
+
+function emptyFeatureCollection() {
+
+    return {
+        type:
+            "FeatureCollection",
+
+        features:
+            []
+    };
+
+}
