@@ -1,47 +1,26 @@
-/* =========================================================
-   GENERAL
-   ========================================================= */
-
 * {
     box-sizing: border-box;
 }
-
 
 html,
 body {
     width: 100%;
     height: 100%;
-
-    margin: 0;
     padding: 0;
+    margin: 0;
 
     font-family:
         Corbel,
         Arial,
         sans-serif;
 
-    color: #17211d;
-
-    background: #eef2f0;
+    color: #151515;
+    background: #f3f5f4;
 }
-
-
-button,
-input,
-select {
-    font-family: inherit;
-}
-
 
 button {
-    cursor: pointer;
+    font-family: inherit;
 }
-
-
-.hidden {
-    display: none !important;
-}
-
 
 
 /* =========================================================
@@ -52,11 +31,12 @@ button {
     display: grid;
 
     grid-template-columns:
-        340px
-        1fr;
+        300px
+        minmax(500px, 1fr)
+        360px;
 
     grid-template-rows:
-        76px
+        80px
         1fr;
 
     width: 100vw;
@@ -64,13 +44,12 @@ button {
 }
 
 
-
 /* =========================================================
    HEADER
    ========================================================= */
 
 .header {
-    grid-column: 1 / 3;
+    grid-column: 1 / 4;
 
     display: flex;
     align-items: center;
@@ -79,7 +58,7 @@ button {
         linear-gradient(
             90deg,
             #008565,
-            #006b4f
+            #00664f
         );
 
     color: white;
@@ -87,702 +66,333 @@ button {
 
 
 .brand {
-    width: 340px;
+    width: 300px;
     height: 100%;
 
     display: flex;
-    flex-direction: column;
-    justify-content: center;
+    align-items: center;
 
-    padding-left: 22px;
+    padding:
+        7px
+        18px;
 
     border-right:
         1px solid
-        rgba(255, 255, 255, 0.28);
+        rgba(255, 255, 255, 0.30);
 }
 
 
-.brand-main {
-    font-size: 21px;
-    font-weight: 700;
+.sport-ireland-logo {
+    display: block;
 
-    letter-spacing: 0.4px;
+    width: auto;
+    height: 62px;
+
+    max-width: 255px;
+
+    object-fit: contain;
+    object-position: left center;
 }
 
 
-.brand-sub {
-    margin-top: 3px;
+.header-description {
+    padding-left: 26px;
 
-    font-size: 14px;
-
-    letter-spacing: 0.7px;
-
-    opacity: 0.92;
+    font-size: 22px;
+    font-weight: 600;
 }
-
-
-.header-copy {
-    padding-left: 25px;
-
-    font-size: 18px;
-}
-
 
 
 /* =========================================================
-   CONTROL PANEL
+   PANELS
    ========================================================= */
 
-.control-panel {
-    overflow-y: auto;
+.filter-panel,
+.details-panel {
+    background: #ffffff;
 
-    margin:
-        8px
-        4px
-        8px
-        8px;
-
-    background: white;
+    margin: 8px;
 
     border:
         1px solid
-        #00a878;
+        #009b71;
 
     border-radius: 12px;
+
+    overflow-y: auto;
 }
 
+.filter-panel {
+    margin-right: 4px;
+}
 
-.panel-title {
+.details-panel {
+    margin-left: 4px;
+}
+
+.panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 56px;
+
     padding:
-        17px
-        18px;
+        12px
+        16px;
 
     border-bottom:
         1px solid
-        #dde4e1;
+        #e2e6e4;
+}
+
+.panel-heading h2 {
+    padding: 0;
+    margin: 0;
 
     font-size: 20px;
-
-    font-weight: 700;
 }
 
 
-
 /* =========================================================
-   MODE SWITCH
+   FILTER ACTIONS
    ========================================================= */
 
-.mode-switch {
-    display: grid;
-
-    grid-template-columns:
-        1fr
-        1fr;
-
+.filter-actions {
+    display: flex;
+    align-items: center;
     gap: 6px;
+}
 
+.filter-divider {
+    color: #9aa5a0;
+    font-size: 13px;
+}
+
+.text-button {
+    padding: 0;
+
+    border: none;
+    background: transparent;
+
+    color: #007b5e;
+
+    font-size: 13px;
+
+    cursor: pointer;
+}
+
+.text-button:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   FILTERS
+   ========================================================= */
+
+.filter-section {
     padding:
         14px
         16px;
 
     border-bottom:
         1px solid
-        #e3e8e6;
+        #e6e9e7;
 }
 
-
-.mode-button {
+.compact-filter-section {
     padding:
         10px
-        8px;
-
-    border:
-        1px solid
-        #b8d7cc;
-
-    border-radius: 8px;
-
-    background: #f4faf7;
-
-    color: #006b4f;
-
-    font-size: 14px;
-
-    font-weight: 700;
-}
-
-
-.mode-button.active {
-    border-color: #008565;
-
-    background: #008565;
-
-    color: white;
-}
-
-
-
-/* =========================================================
-   CONTROLS
-   ========================================================= */
-
-.control-section {
-    padding:
-        15px
         16px;
-
-    border-bottom:
-        1px solid
-        #e3e8e6;
 }
 
+.filter-section h3 {
+    margin:
+        0
+        0
+        11px
+        0;
 
-.control-label {
-    display: block;
-
-    margin-bottom: 7px;
-
-    font-size: 14px;
-
-    font-weight: 700;
+    font-size: 16px;
 }
 
-
-.control-select,
-.search-input {
-    width: 100%;
-
-    min-height: 40px;
-
-    padding:
-        8px
-        10px;
-
-    border:
-        1px solid
-        #bac8c2;
-
-    border-radius: 7px;
-
-    background: white;
-
-    color: #17211d;
-
-    font-size: 14px;
-}
-
-
-.control-select:focus,
-.search-input:focus {
-    outline:
-        2px solid
-        rgba(0, 168, 120, 0.18);
-
-    border-color: #00a878;
-}
-
-
-.search-row {
-    display: grid;
-
-    grid-template-columns:
-        1fr
-        auto;
+.checkbox-list {
+    display: flex;
+    flex-direction: column;
 
     gap: 7px;
 }
 
+.checkbox-item {
+    display: flex;
+    align-items: center;
 
-.primary-button {
-    border: none;
+    gap: 8px;
 
-    border-radius: 7px;
-
-    background: #008565;
-
-    color: white;
+    min-height: 25px;
 
     font-size: 14px;
 
-    font-weight: 700;
+    cursor: pointer;
 }
 
+.checkbox-item input {
+    width: 17px;
+    height: 17px;
 
-.primary-button:hover {
-    background: #006b4f;
+    flex-shrink: 0;
+
+    accent-color: #008c68;
 }
 
+.colour-square {
+    display: inline-block;
 
-.search-button {
-    padding:
-        0
-        14px;
-}
+    width: 18px;
+    height: 18px;
 
+    flex-shrink: 0;
 
-.secondary-button {
-    width: 100%;
-
-    margin-top: 8px;
-
-    padding:
-        9px
-        10px;
+    border-radius: 4px;
 
     border:
         1px solid
-        #9ccbbd;
-
-    border-radius: 7px;
-
-    background: #f0f8f5;
-
-    color: #006b4f;
-
-    font-size: 13px;
-
-    font-weight: 700;
+        rgba(0, 0, 0, 0.08);
 }
-
-
-.secondary-button:hover {
-    background: #e2f2ec;
-}
-
-
-.search-message {
-    margin-top: 9px;
-
-    color: #66746e;
-
-    font-size: 12px;
-
-    line-height: 1.4;
-}
-
 
 
 /* =========================================================
-   SPIDER INFO
+   DROPDOWNS
    ========================================================= */
 
-.spider-info {
+.filter-dropdown-button {
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
     padding:
-        11px
-        12px;
+        10px
+        11px;
 
     border:
         1px solid
         #b9d9cd;
 
-    border-radius: 9px;
+    border-radius: 8px;
 
-    background: #edf8f4;
-}
+    background: #f3faf7;
 
-
-.spider-info strong {
-    color: #006b4f;
-}
-
-
-.spider-info p {
-    margin:
-        5px
-        0
-        0
-        0;
-
-    color: #50615a;
+    color: #006f54;
 
     font-size: 13px;
+    font-weight: 700;
 
-    line-height: 1.4;
+    cursor: pointer;
 }
 
+.filter-dropdown-button:hover {
+    background: #e7f4ef;
+}
 
+.dropdown-arrow {
+    font-size: 15px;
+}
 
-/* =========================================================
-   METRICS
-   ========================================================= */
-
-.metrics-section {
-    display: grid;
-
-    grid-template-columns:
-        1fr
-        1fr;
-
-    gap: 8px;
+.dropdown-list {
+    margin-top: 10px;
 
     padding:
-        14px
-        16px;
-
-    border-bottom:
-        1px solid
-        #e3e8e6;
+        4px
+        3px
+        5px;
 }
 
-
-.metric-card {
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 3px;
-
-    padding:
-        11px
-        12px;
-
-    border-radius: 9px;
-
-    background: #eef7f3;
+.hidden {
+    display: none !important;
 }
-
-
-.metric-label {
-    color: #65736d;
-
-    font-size: 11px;
-
-    text-transform: uppercase;
-
-    letter-spacing: 0.4px;
-}
-
-
-.metric-card strong {
-    color: #006b4f;
-
-    font-size: 20px;
-}
-
 
 
 /* =========================================================
    RESULTS
    ========================================================= */
 
-.results-section {
-    padding:
-        14px
-        16px
-        18px;
-}
+.results-box {
+    margin: 15px;
 
-
-.results-heading {
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-
-    margin-bottom: 10px;
-}
-
-
-.results-heading h2 {
-    margin: 0;
-
-    font-size: 16px;
-}
-
-
-#resultsStatus {
-    color: #6b7872;
-
-    font-size: 11px;
-}
-
-
-.results-list {
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 8px;
-}
-
-
-.result-card {
     padding:
         11px
         12px;
 
-    border:
-        1px solid
-        #dce4e0;
-
-    border-radius: 9px;
-
-    background: #ffffff;
-
-    cursor: pointer;
-
-    transition:
-        transform 0.12s ease,
-        border-color 0.12s ease,
-        box-shadow 0.12s ease;
-}
-
-
-.result-card:hover {
-    transform:
-        translateY(-1px);
-
-    border-color: #00a878;
-
-    box-shadow:
-        0
-        3px
-        10px
-        rgba(0, 0, 0, 0.08);
-}
-
-
-.result-rank {
-    display: inline-flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    width: 24px;
-    height: 24px;
-
-    margin-right: 7px;
-
-    border-radius: 50%;
-
-    background: #008565;
+    background: #008c68;
 
     color: white;
 
-    font-size: 12px;
+    border-radius: 22px;
 
-    font-weight: 700;
-}
-
-
-.result-title-row {
-    display: flex;
-
-    align-items: center;
-
-    margin-bottom: 7px;
-}
-
-
-.result-title {
-    min-width: 0;
-
-    overflow: hidden;
-
-    text-overflow: ellipsis;
-
-    white-space: nowrap;
+    text-align: center;
 
     font-size: 14px;
-
     font-weight: 700;
 }
-
-
-.result-meta {
-    display: flex;
-
-    flex-wrap: wrap;
-
-    gap:
-        5px
-        12px;
-
-    color: #66736e;
-
-    font-size: 12px;
-}
-
-
-.result-distance {
-    color: #006b4f;
-
-    font-weight: 700;
-}
-
 
 
 /* =========================================================
    MAP
    ========================================================= */
 
-.map-panel {
+.map-container {
     position: relative;
 
-    overflow: hidden;
-
     margin:
-        8px
-        8px
         8px
         4px;
 
     border:
         1px solid
-        #00a878;
+        #009b71;
 
     border-radius: 12px;
 
-    background: #e8efec;
+    overflow: hidden;
+
+    background: #f4f5f4;
 }
 
-
-#map {
+#viewDiv {
     width: 100%;
     height: 100%;
 }
 
 
-
 /* =========================================================
-   CENTRE TARGET
+   FULL IRELAND
    ========================================================= */
 
-.centre-target {
+.map-home-button {
     position: absolute;
 
     z-index: 20;
 
-    top: 50%;
-    left: 50%;
+    top: 110px;
+    left: 15px;
 
-    width: 28px;
-    height: 28px;
+    display: flex;
+    align-items: center;
 
-    transform:
-        translate(
-            -50%,
-            -50%
-        );
+    gap: 7px;
 
-    pointer-events: none;
-}
-
-
-.target-horizontal,
-.target-vertical {
-    position: absolute;
-
-    background: #006b4f;
-}
-
-
-.target-horizontal {
-    top: 13px;
-    left: 0;
-
-    width: 28px;
-    height: 2px;
-}
-
-
-.target-vertical {
-    top: 0;
-    left: 13px;
-
-    width: 2px;
-    height: 28px;
-}
-
-
-.target-dot {
-    position: absolute;
-
-    top: 10px;
-    left: 10px;
-
-    width: 8px;
-    height: 8px;
-
-    border:
-        2px solid
-        white;
-
-    border-radius: 50%;
-
-    background: #00a878;
-
-    box-shadow:
-        0
-        1px
-        4px
-        rgba(0, 0, 0, 0.35);
-}
-
-
-
-/* =========================================================
-   MAP STATUS
-   ========================================================= */
-
-.map-status {
-    position: absolute;
-
-    z-index: 12;
-
-    right: 12px;
-    bottom: 12px;
-
-    max-width: 300px;
+    height: 38px;
 
     padding:
-        8px
-        11px;
-
-    border-radius: 7px;
-
-    background:
-        rgba(
-            255,
-            255,
-            255,
-            0.94
-        );
-
-    color: #47544e;
-
-    font-size: 12px;
-
-    box-shadow:
         0
-        2px
-        8px
-        rgba(0, 0, 0, 0.14);
-}
-
-
-
-/* =========================================================
-   RESET
-   ========================================================= */
-
-.map-reset-button {
-    position: absolute;
-
-    z-index: 12;
-
-    top: 78px;
-    left: 10px;
-
-    padding:
-        9px
-        11px;
+        12px;
 
     border: none;
 
-    border-radius: 7px;
+    border-radius: 8px;
 
     background:
         rgba(
@@ -792,10 +402,159 @@ button {
             0.96
         );
 
-    color: #006b4f;
+    color: #00664f;
 
     font-size: 13px;
+    font-weight: 700;
 
+    cursor: pointer;
+
+    box-shadow:
+        0
+        2px
+        8px
+        rgba(0, 0, 0, 0.20);
+}
+
+.map-home-button:hover {
+    background: #e6f5ed;
+}
+
+.home-icon {
+    font-size: 21px;
+    line-height: 1;
+}
+
+
+/* =========================================================
+   LEGEND
+   ========================================================= */
+
+.custom-legend {
+    position: absolute;
+
+    z-index: 10;
+
+    left: 16px;
+
+    /*
+       Raised to make room for the data.gov.ie button.
+    */
+    bottom: 72px;
+
+    width: 245px;
+
+    padding:
+        12px
+        14px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.95
+        );
+
+    border-radius: 10px;
+
+    box-shadow:
+        0
+        2px
+        12px
+        rgba(0, 0, 0, 0.18);
+}
+
+.custom-legend h3 {
+    padding: 0;
+
+    margin:
+        0
+        0
+        10px
+        0;
+
+    font-size: 15px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+
+    margin-bottom: 6px;
+
+    font-size: 13px;
+}
+
+.legend-colour {
+    width: 18px;
+    height: 14px;
+
+    display: inline-block;
+
+    flex-shrink: 0;
+
+    border-radius: 3px;
+}
+
+.legend-note {
+    margin-top: 8px;
+
+    padding-top: 8px;
+
+    border-top:
+        1px solid
+        #e1e5e3;
+
+    color: #65716c;
+
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   DATA.GOV.IE BUTTON
+   ========================================================= */
+
+.dataset-button {
+    position: absolute;
+
+    z-index: 20;
+
+    left: 16px;
+    bottom: 18px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    height: 40px;
+
+    padding:
+        0
+        14px;
+
+    border:
+        1px solid
+        #008c68;
+
+    border-radius: 8px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.96
+        );
+
+    color: #00664f;
+
+    text-decoration: none;
+
+    font-size: 13px;
     font-weight: 700;
 
     box-shadow:
@@ -805,57 +564,307 @@ button {
         rgba(0, 0, 0, 0.18);
 }
 
+.dataset-button:hover {
+    background: #e6f5ed;
+}
 
 
 /* =========================================================
-   MAPLIBRE POPUP
+   DETAILS
    ========================================================= */
 
-.maplibregl-popup-content {
-    min-width: 220px;
+.close-button {
+    border: none;
 
-    padding:
-        13px
-        14px;
+    background: transparent;
 
-    border-radius: 9px;
+    color: #00664e;
+
+    font-size: 28px;
+
+    cursor: pointer;
 }
 
+.empty-state {
+    padding:
+        70px
+        30px;
 
-.popup-title {
+    text-align: center;
+
+    color: #607069;
+}
+
+.empty-icon {
+    margin-bottom: 15px;
+
+    color: #008c68;
+
+    font-size: 48px;
+}
+
+.empty-state h3 {
     margin-bottom: 7px;
 
-    font-size: 15px;
+    color: #22342d;
+}
 
-    font-weight: 700;
+.empty-state p {
+    margin: 0;
+
+    line-height: 1.5;
 }
 
 
-.popup-row {
-    margin-top: 4px;
+/* =========================================================
+   FACILITY DETAILS
+   ========================================================= */
 
-    color: #50605a;
+.facility-details {
+    padding: 15px;
+}
+
+
+/* =========================================================
+   MULTI FACILITY NAVIGATION
+   ========================================================= */
+
+.selection-navigator {
+    display: grid;
+
+    grid-template-columns:
+        42px
+        1fr
+        42px;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin-bottom: 14px;
+
+    padding:
+        8px
+        10px;
+
+    border:
+        1px solid
+        #b9d9cd;
+
+    border-radius: 10px;
+
+    background: #f3faf7;
+}
+
+.selection-navigator.hidden {
+    display: none;
+}
+
+.navigator-button {
+    width: 38px;
+    height: 38px;
+
+    padding: 0;
+
+    border:
+        1px solid
+        #9ecdbd;
+
+    border-radius: 50%;
+
+    background: #ffffff;
+
+    color: #007b5e;
+
+    font-size: 27px;
+
+    cursor: pointer;
+}
+
+.navigator-button:hover {
+    background: #e6f5ed;
+}
+
+.navigator-centre {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    text-align: center;
+
+    color: #42524b;
 
     font-size: 12px;
 }
 
+.navigator-centre strong {
+    color: #006f54;
+
+    font-size: 15px;
+}
 
 
 /* =========================================================
-   RESPONSIVE
+   FACILITY TITLE
    ========================================================= */
 
-@media (max-width: 1050px) {
+.facility-title-box {
+    padding: 16px;
+
+    margin-bottom: 16px;
+
+    background: #e6f5ed;
+
+    border-radius: 10px;
+}
+
+.facility-title-box h2 {
+    padding: 0;
+
+    margin:
+        0
+        0
+        10px
+        0;
+
+    font-size: 22px;
+}
+
+.facility-tags {
+    display: flex;
+    flex-wrap: wrap;
+
+    gap: 7px;
+}
+
+.tag {
+    display: inline-block;
+
+    padding:
+        5px
+        12px;
+
+    border-radius: 20px;
+
+    color: white;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.tag-secondary {
+    background: #b8ead0;
+
+    color: #173e2c;
+}
+
+
+/* =========================================================
+   DETAILS TABLE
+   ========================================================= */
+
+.details-table {
+    border-top:
+        1px solid
+        #d9dfdc;
+}
+
+.detail-row {
+    display: grid;
+
+    grid-template-columns:
+        44%
+        56%;
+
+    gap: 8px;
+
+    padding:
+        9px
+        4px;
+
+    border-bottom:
+        1px solid
+        #e1e5e3;
+
+    font-size: 14px;
+}
+
+.detail-row span {
+    color: #44534d;
+}
+
+.detail-row strong {
+    font-weight: 600;
+}
+
+
+/* =========================================================
+   PRIMARY BUTTON
+   ========================================================= */
+
+.primary-button {
+    width: 100%;
+
+    margin-top: 18px;
+
+    padding:
+        12px
+        14px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background: #008c68;
+
+    color: white;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.primary-button:hover {
+    background: #006f54;
+}
+
+
+/* =========================================================
+   SMALLER SCREENS
+   ========================================================= */
+
+@media (max-width: 1200px) {
 
     .app {
         grid-template-columns:
-            290px
-            1fr;
+            260px
+            minmax(400px, 1fr)
+            330px;
     }
 
-
     .brand {
-        width: 290px;
+        width: 260px;
+    }
+
+    .sport-ireland-logo {
+        max-width: 220px;
+    }
+
+    .text-button {
+        font-size: 12px;
+    }
+
+    .home-label {
+        display: none;
+    }
+
+    .map-home-button {
+        width: 38px;
+
+        padding: 0;
+
+        justify-content: center;
     }
 
 }
